@@ -5,29 +5,21 @@ from services.calcul_projection import CalculProjection
 
 class ServiceProjection:
 
-    _instance = None
+    def __init__(
+        self,
+        nom_fichier="simulations.json",
+    ):
+        self.dernier_resultat = None
+        self.simulations = []
+        self.stockage = ServiceStockage()
+        self.nom_fichier = nom_fichier
 
-
-    def __new__(cls):
-
-        if cls._instance is None:
-
-            cls._instance = super().__new__(cls)
-
-            cls._instance.dernier_resultat = None
-            cls._instance.simulations = []
-            cls._instance.stockage = ServiceStockage()
-
-            cls._instance._charger()
-
-        return cls._instance
-
-
+        self._charger()
 
     def _charger(self):
 
         donnees = self.stockage.charger(
-            "simulations.json"
+            self.nom_fichier
         )
 
         self.simulations = []
@@ -35,11 +27,9 @@ class ServiceProjection:
         if not donnees:
             return
 
-
         for element in donnees:
 
             try:
-
                 simulation = Simulation.from_dict(
                     element
                 )
@@ -49,17 +39,12 @@ class ServiceProjection:
                 )
 
             except Exception:
-
                 pass
 
-
         if self.simulations:
-
             self.dernier_resultat = (
                 self.simulations[-1]
             )
-
-
 
     def calculer(
         self,
@@ -80,8 +65,6 @@ class ServiceProjection:
 
         return simulation
 
-
-
     def calculer_scenarios(
         self,
         capital_initial,
@@ -92,14 +75,12 @@ class ServiceProjection:
 
         scenarios = {}
 
-
         scenarios["prudent"] = CalculProjection.calculer(
             capital_initial,
             versement_mensuel,
             taux_annuel * 0.7,
             duree,
         )
-
 
         scenarios["normal"] = CalculProjection.calculer(
             capital_initial,
@@ -108,7 +89,6 @@ class ServiceProjection:
             duree,
         )
 
-
         scenarios["optimiste"] = CalculProjection.calculer(
             capital_initial,
             versement_mensuel,
@@ -116,28 +96,19 @@ class ServiceProjection:
             duree,
         )
 
-
         return scenarios
-
-
 
     def _sauvegarder(self):
 
         donnees = [
-
             simulation.to_dict()
-
             for simulation in self.simulations
-
         ]
 
-
         self.stockage.sauvegarder(
-            "simulations.json",
+            self.nom_fichier,
             donnees,
         )
-
-
 
     def ajouter_simulation(
         self,
@@ -152,13 +123,9 @@ class ServiceProjection:
 
         self._sauvegarder()
 
-
-
     def obtenir_simulations(self):
 
         return self.simulations
-
-
 
     def obtenir_simulation(
         self,
@@ -166,12 +133,9 @@ class ServiceProjection:
     ):
 
         if 0 <= index < len(self.simulations):
-
             return self.simulations[index]
 
         return None
-
-
 
     def supprimer_simulation(
         self,
@@ -182,31 +146,21 @@ class ServiceProjection:
 
             del self.simulations[index]
 
-
             if self.simulations:
-
                 self.dernier_resultat = (
                     self.simulations[-1]
                 )
-
             else:
-
                 self.dernier_resultat = None
 
-
             self._sauvegarder()
-
-
 
     def vider(self):
 
         self.simulations.clear()
-
         self.dernier_resultat = None
 
         self._sauvegarder()
-
-
 
     def obtenir_dernier_resultat(self):
 
