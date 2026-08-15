@@ -7,12 +7,12 @@ Réutilise le moteur financier et le service IA existants.
 
 from __future__ import annotations
 
-import os
 import sys
-import uuid
+import json
+from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, request, render_template_string, session
+from flask import Flask, request, render_template_string
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 
@@ -24,26 +24,51 @@ from services.service_projection import ServiceProjection
 from services.service_ia import ServiceIA
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get(
-    "SECRET_KEY",
-    "simulateur-financier-autonome-session-v1-2026",
-)
-
 service_ia = ServiceIA()
+service_projection = ServiceProjection()
+
+FICHIER_COMPTEUR = RACINE_PROJET / "donnees" / "compteur_utilisation.json"
 
 
-def obtenir_service_projection_utilisateur():
-    identifiant = session.get("utilisateur_id")
+def enregistrer_utilisation():
+    """Compte les simulations lancées sans enregistrer de donnée utilisateur."""
+    FICHIER_COMPTEUR.parent.mkdir(parents=True, exist_ok=True)
 
-    if not identifiant:
-        identifiant = uuid.uuid4().hex
-        session["utilisateur_id"] = identifiant
+    donnees = {
+        "nombre_simulations": 0,
+        "derniere_utilisation": None,
+    }
 
-    nom_fichier = f"simulations_{identifiant}.json"
+    try:
+        if FICHIER_COMPTEUR.exists():
+            with FICHIER_COMPTEUR.open("r", encoding="utf-8") as fichier:
+                charge = json.load(fichier)
+                if isinstance(charge, dict):
+                    donnees.update(charge)
+    except (OSError, json.JSONDecodeError):
+        pass
 
-    return ServiceProjection(
-        nom_fichier=nom_fichier
+    try:
+        donnees["nombre_simulations"] = int(
+            donnees.get("nombre_simulations", 0)
+        ) + 1
+    except (TypeError, ValueError):
+        donnees["nombre_simulations"] = 1
+
+    donnees["derniere_utilisation"] = datetime.now().isoformat(
+        timespec="seconds"
     )
+
+    try:
+        with FICHIER_COMPTEUR.open("w", encoding="utf-8") as fichier:
+            json.dump(
+                donnees,
+                fichier,
+                ensure_ascii=False,
+                indent=4,
+            )
+    except OSError:
+        pass
 
 
 def formater_euros(valeur: float) -> str:
@@ -377,8 +402,6 @@ SIMULER
     methods=["GET", "POST"],
 )
 def accueil():
-    service_projection = obtenir_service_projection_utilisateur()
-
     simulation = None
     analyse_ia = None
     scenarios = None
@@ -452,6 +475,7 @@ def accueil():
                 duree,
             )
 
+            enregistrer_utilisation()
             service_projection.ajouter_simulation(simulation)
 
             scenarios = {
@@ -738,7 +762,6 @@ select{
 
 @app.route("/comparaison")
 def comparaison():
-    service_projection = obtenir_service_projection_utilisateur()
     simulations = list(service_projection.obtenir_simulations())
 
     if len(simulations) < 2:
@@ -899,7 +922,6 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 
 @app.route("/historique")
 def historique():
-    service_projection = obtenir_service_projection_utilisateur()
     simulations = list(service_projection.obtenir_simulations())
     return render_template_string(
         HISTORIQUE_HTML,
