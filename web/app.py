@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -25,48 +26,30 @@ from services.service_ia import ServiceIA
 app = Flask(__name__)
 service_ia = ServiceIA()
 
-FICHIER_COMPTEUR = RACINE_PROJET / "donnees" / "compteur_utilisation.json"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
+journal = logging.getLogger("simulateur_financier")
 
-
-def enregistrer_utilisation():
-    """Compte les simulations lancées sans enregistrer de donnée utilisateur."""
-    FICHIER_COMPTEUR.parent.mkdir(parents=True, exist_ok=True)
-
-    donnees = {
-        "nombre_simulations": 0,
-        "derniere_utilisation": None,
-    }
-
+def enregistrer_utilisation(simulation):
+    """
+    Enregistre chaque simulation validée dans les logs Render.
+    Aucune donnée permettant d'identifier l'utilisateur n'est enregistrée.
+    """
     try:
-        if FICHIER_COMPTEUR.exists():
-            with FICHIER_COMPTEUR.open("r", encoding="utf-8") as fichier:
-                charge = json.load(fichier)
-                if isinstance(charge, dict):
-                    donnees.update(charge)
-    except (OSError, json.JSONDecodeError):
-        pass
-
-    try:
-        donnees["nombre_simulations"] = int(
-            donnees.get("nombre_simulations", 0)
-        ) + 1
-    except (TypeError, ValueError):
-        donnees["nombre_simulations"] = 1
-
-    donnees["derniere_utilisation"] = datetime.now().isoformat(
-        timespec="seconds"
-    )
-
-    try:
-        with FICHIER_COMPTEUR.open("w", encoding="utf-8") as fichier:
-            json.dump(
-                donnees,
-                fichier,
-                ensure_ascii=False,
-                indent=4,
-            )
-    except OSError:
-        pass
+        journal.info(
+            "SIMULATION_UTILISEE | capital_initial=%.2f | "
+            "versement_mensuel=%.2f | rendement_annuel=%.2f%% | "
+            "duree=%s | capital_final=%.2f",
+            float(simulation.capital_initial),
+            float(simulation.versement_mensuel),
+            float(simulation.taux),
+            simulation.duree,
+            float(simulation.capital_final),
+        )
+    except Exception:
+        journal.info("SIMULATION_UTILISEE")
 
 
 def formater_euros(valeur: float) -> str:
@@ -493,7 +476,7 @@ def accueil():
                 duree,
             )
 
-            enregistrer_utilisation()
+            enregistrer_utilisation(simulation)
 
             scenarios = {
                 "prudent": CalculProjection.calculer(
