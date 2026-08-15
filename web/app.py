@@ -20,12 +20,10 @@ if str(RACINE_PROJET) not in sys.path:
     sys.path.insert(0, str(RACINE_PROJET))
 
 from services.calcul_projection import CalculProjection
-from services.service_projection import ServiceProjection
 from services.service_ia import ServiceIA
 
 app = Flask(__name__)
 service_ia = ServiceIA()
-service_projection = ServiceProjection()
 
 FICHIER_COMPTEUR = RACINE_PROJET / "donnees" / "compteur_utilisation.json"
 
@@ -392,6 +390,26 @@ SIMULER
 <div class="note">Outil pédagogique de simulation — aucune projection ne constitue une garantie de résultat futur.</div>
 </main>
 </div>
+
+{% if simulation_locale %}
+<script>
+(function () {
+    const simulation = {{ simulation_locale|tojson }};
+    const cle = "simulateur_financier_historique_v1";
+    let historique = [];
+
+    try {
+        historique = JSON.parse(localStorage.getItem(cle) || "[]");
+        if (!Array.isArray(historique)) historique = [];
+    } catch (e) {
+        historique = [];
+    }
+
+    historique.push(simulation);
+    localStorage.setItem(cle, JSON.stringify(historique));
+})();
+</script>
+{% endif %}
 </body>
 </html>
 """
@@ -476,7 +494,6 @@ def accueil():
             )
 
             enregistrer_utilisation()
-            service_projection.ajouter_simulation(simulation)
 
             scenarios = {
                 "prudent": CalculProjection.calculer(
@@ -621,6 +638,11 @@ def accueil():
         risque=risque,
         score_ia=score_ia,
         profil_ia=profil_ia,
+        simulation_locale=(
+            simulation.to_dict()
+            if simulation
+            else None
+        ),
     )
 
 
@@ -713,7 +735,7 @@ select{
 <div class="sous">Comparez deux simulations enregistrées</div>
 
 {% if simulations|length < 2 %}
-<div class="scenario vide">Au moins 2 simulations sont requises pour effectuer une comparaison.</div>
+<div class="scenario vide">La comparaison sera réactivée après validation de l’historique privé du navigateur.</div>
 {% else %}
 <form class="selection" method="get">
 <div>
@@ -762,39 +784,13 @@ select{
 
 @app.route("/comparaison")
 def comparaison():
-    simulations = list(service_projection.obtenir_simulations())
-
-    if len(simulations) < 2:
-        return render_template_string(
-            COMPARAISON_HTML,
-            simulations=simulations,
-            simulation_a=None,
-            simulation_b=None,
-            index_a=0,
-            index_b=0,
-            euros=formater_euros,
-        )
-
-    try:
-        index_a = int(request.args.get("a", len(simulations) - 2))
-    except (TypeError, ValueError):
-        index_a = len(simulations) - 2
-
-    try:
-        index_b = int(request.args.get("b", len(simulations) - 1))
-    except (TypeError, ValueError):
-        index_b = len(simulations) - 1
-
-    index_a = max(0, min(index_a, len(simulations) - 1))
-    index_b = max(0, min(index_b, len(simulations) - 1))
-
     return render_template_string(
         COMPARAISON_HTML,
-        simulations=simulations,
-        simulation_a=simulations[index_a],
-        simulation_b=simulations[index_b],
-        index_a=index_a,
-        index_b=index_b,
+        simulations=[],
+        simulation_a=None,
+        simulation_b=None,
+        index_a=0,
+        index_b=0,
         euros=formater_euros,
     )
 
@@ -831,35 +827,68 @@ tr:hover td{background:#0a1a2a}
 </header>
 <main class="page">
 <h2>HISTORIQUE DES SIMULATIONS</h2>
-{% if simulations %}
-<div class="tableau">
+<div id="historique-vide" class="vide">Aucune simulation enregistrée.</div>
+<div id="historique-tableau" class="tableau" style="display:none">
 <table>
 <thead><tr>
 <th>N°</th><th>Date</th><th>Capital initial</th><th>Versement mensuel</th>
 <th>Rendement annuel</th><th>Durée</th><th>Total versé</th>
 <th>Capital final</th><th>Plus-value</th><th>Performance</th>
 </tr></thead>
-<tbody>
-{% for sim in simulations %}
-<tr>
-<td>{{ loop.index }}</td>
-<td>{{ sim.date_creation.strftime('%d/%m/%Y %H:%M') }}</td>
-<td>{{ euros(sim.capital_initial) }}</td>
-<td>{{ euros(sim.versement_mensuel) }}</td>
-<td>{{ "%.2f"|format(sim.taux) }} %</td>
-<td>{{ sim.duree }} ans</td>
-<td>{{ euros(sim.total_versements) }}</td>
-<td>{{ euros(sim.capital_final) }}</td>
-<td>{{ euros(sim.gains) }}</td>
-<td>{{ "%.2f"|format(sim.performance) }} %</td>
-</tr>
-{% endfor %}
-</tbody>
+<tbody id="historique-corps"></tbody>
 </table>
 </div>
-{% else %}
-<div class="vide">Aucune simulation enregistrée.</div>
-{% endif %}
+
+<script>
+(function () {
+    const cle = "simulateur_financier_historique_v1";
+    let historique = [];
+
+    try {
+        historique = JSON.parse(localStorage.getItem(cle) || "[]");
+        if (!Array.isArray(historique)) historique = [];
+    } catch (e) {
+        historique = [];
+    }
+
+    if (!historique.length) return;
+
+    const euros = valeur =>
+        Number(valeur || 0).toLocaleString("fr-FR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }) + " €";
+
+    const corps = document.getElementById("historique-corps");
+
+    historique.forEach((sim, index) => {
+        const date = sim.date_creation
+            ? new Date(sim.date_creation).toLocaleString("fr-FR", {
+                day:"2-digit", month:"2-digit", year:"numeric",
+                hour:"2-digit", minute:"2-digit"
+              })
+            : "-";
+
+        const ligne = document.createElement("tr");
+        ligne.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${date}</td>
+            <td>${euros(sim.capital_initial)}</td>
+            <td>${euros(sim.versement_mensuel)}</td>
+            <td>${Number(sim.taux || 0).toFixed(2)} %</td>
+            <td>${sim.duree || 0} ans</td>
+            <td>${euros(sim.total_versements)}</td>
+            <td>${euros(sim.capital_final)}</td>
+            <td>${euros(sim.gains)}</td>
+            <td>${Number(sim.performance || 0).toFixed(2)} %</td>
+        `;
+        corps.appendChild(ligne);
+    });
+
+    document.getElementById("historique-vide").style.display = "none";
+    document.getElementById("historique-tableau").style.display = "block";
+})();
+</script>
 </main>
 </body>
 </html>
@@ -922,10 +951,9 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 
 @app.route("/historique")
 def historique():
-    simulations = list(service_projection.obtenir_simulations())
     return render_template_string(
         HISTORIQUE_HTML,
-        simulations=simulations,
+        simulations=[],
         euros=formater_euros,
     )
 
