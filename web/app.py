@@ -7,10 +7,12 @@ Réutilise le moteur financier et le service IA existants.
 
 from __future__ import annotations
 
+import os
 import sys
+import uuid
 from pathlib import Path
 
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, session
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 
@@ -22,8 +24,26 @@ from services.service_projection import ServiceProjection
 from services.service_ia import ServiceIA
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY",
+    "simulateur-financier-autonome-session-v1-2026",
+)
+
 service_ia = ServiceIA()
-service_projection = ServiceProjection()
+
+
+def obtenir_service_projection_utilisateur():
+    identifiant = session.get("utilisateur_id")
+
+    if not identifiant:
+        identifiant = uuid.uuid4().hex
+        session["utilisateur_id"] = identifiant
+
+    nom_fichier = f"simulations_{identifiant}.json"
+
+    return ServiceProjection(
+        nom_fichier=nom_fichier
+    )
 
 
 def formater_euros(valeur: float) -> str:
@@ -357,6 +377,8 @@ SIMULER
     methods=["GET", "POST"],
 )
 def accueil():
+    service_projection = obtenir_service_projection_utilisateur()
+
     simulation = None
     analyse_ia = None
     scenarios = None
@@ -716,6 +738,7 @@ select{
 
 @app.route("/comparaison")
 def comparaison():
+    service_projection = obtenir_service_projection_utilisateur()
     simulations = list(service_projection.obtenir_simulations())
 
     if len(simulations) < 2:
@@ -876,6 +899,7 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 
 @app.route("/historique")
 def historique():
+    service_projection = obtenir_service_projection_utilisateur()
     simulations = list(service_projection.obtenir_simulations())
     return render_template_string(
         HISTORIQUE_HTML,
