@@ -642,6 +642,10 @@ html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);fon
     .ligne{border-bottom:1px solid #ccc!important}
     .ligne strong,.ligne span{color:black!important}
     .sous{color:#333!important}
+    .synthese{background:white!important;color:black!important;border:1px solid #777!important}
+    .synthese h3,.synthese-grille strong,.synthese-grille span{color:black!important}
+    .synthese-grille div{background:white!important;border:1px solid #999!important}
+    .copyright{color:#333!important;margin-top:18px!important}
 }
 .page{width:min(1180px,96vw);margin:0 auto;padding:20px 0}
 h2{text-align:center;margin:0;color:var(--cyan);font-size:26px}
@@ -669,8 +673,16 @@ select{
 .ligne strong{color:#dffaff}
 .ligne span{color:white}
 .vide{text-align:center;color:#7da0ad;padding:35px}
+.synthese{margin-top:16px;background:#071321;border:1px solid #17384c;border-radius:8px;padding:14px 16px}
+.synthese h3{text-align:center;color:var(--cyan);margin:0 0 12px}
+.synthese-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.synthese-grille div{border:1px solid #28718d;border-radius:6px;padding:12px;text-align:center;background:#0b2032}
+.synthese-grille strong{display:block;font-size:12px;margin-bottom:8px}
+.synthese-grille span{font-size:12px}
+.copyright{text-align:center;color:#477887;font-size:10px;margin:18px 0 4px}
 @media(max-width:800px){
     .selection,.colonnes{grid-template-columns:1fr}
+    .synthese-grille{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -729,7 +741,18 @@ select{
 </section>
 {% endfor %}
 </div>
+
+<section class="synthese">
+<h3>SYNTHÈSE AUTOMATIQUE</h3>
+<div class="synthese-grille">
+<div><strong>Meilleur capital final</strong><span>{{ meilleur_capital }}</span></div>
+<div><strong>Meilleure plus-value</strong><span>{{ meilleure_plus_value }}</span></div>
+<div><strong>Meilleure performance</strong><span>{{ meilleure_performance }}</span></div>
+<div><strong>Écart de capital final</strong><span>{{ ecart_capital }}</span></div>
+</div>
+</section>
 {% endif %}
+<div class="copyright">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 </body>
 </html>
@@ -765,14 +788,40 @@ def comparaison():
     index_a = max(0, min(index_a, len(simulations) - 1))
     index_b = max(0, min(index_b, len(simulations) - 1))
 
+    simulation_a = simulations[index_a]
+    simulation_b = simulations[index_b]
+
+    if simulation_a.capital_final >= simulation_b.capital_final:
+        meilleur_capital = f"Scénario A — {formater_euros(simulation_a.capital_final)}"
+    else:
+        meilleur_capital = f"Scénario B — {formater_euros(simulation_b.capital_final)}"
+
+    if simulation_a.gains >= simulation_b.gains:
+        meilleure_plus_value = f"Scénario A — {formater_euros(simulation_a.gains)}"
+    else:
+        meilleure_plus_value = f"Scénario B — {formater_euros(simulation_b.gains)}"
+
+    if simulation_a.performance >= simulation_b.performance:
+        meilleure_performance = f"Scénario A — {simulation_a.performance:.2f} %"
+    else:
+        meilleure_performance = f"Scénario B — {simulation_b.performance:.2f} %"
+
+    ecart_capital = formater_euros(
+        abs(simulation_a.capital_final - simulation_b.capital_final)
+    )
+
     return render_template_string(
         COMPARAISON_HTML,
         simulations=simulations,
-        simulation_a=simulations[index_a],
-        simulation_b=simulations[index_b],
+        simulation_a=simulation_a,
+        simulation_b=simulation_b,
         index_a=index_a,
         index_b=index_b,
         euros=formater_euros,
+        meilleur_capital=meilleur_capital,
+        meilleure_plus_value=meilleure_plus_value,
+        meilleure_performance=meilleure_performance,
+        ecart_capital=ecart_capital,
     )
 
 
@@ -837,6 +886,7 @@ tr:hover td{background:#0a1a2a}
 {% else %}
 <div class="vide">Aucune simulation enregistrée.</div>
 {% endif %}
+<div style="text-align:center;color:#477887;font-size:10px;margin:18px 0 4px">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 </body>
 </html>
@@ -891,6 +941,7 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 </form>
 <div class="info">Le bouton ouvre le logiciel de messagerie configuré sur l'ordinateur.</div>
 </div>
+<div class="info">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 </body>
 </html>
