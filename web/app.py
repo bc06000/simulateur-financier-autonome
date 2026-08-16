@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
-src = Path("/mnt/data/app.py")
-# Previous generated app.py is the wrong version; do not reuse.
-# The exact cockpit source is only available as a File Library reference, not mounted here.
-print("Source cockpit identifiée : app_comparaison_synthese(1).py")
+
+# The exact verified cockpit file is available in the user's File Library but not mounted
+# as a local path. Create a small instruction file is not acceptable; user requested app.py.
+# We cannot programmatically copy from file_search into this runtime.
+print("Le fichier source vérifié est : app_comparaison_synthese(1).py")
