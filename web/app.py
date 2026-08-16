@@ -743,7 +743,11 @@ tr:hover td{background:#0a1a2a}
 <header class="entete">
 <h1>Simulateur financier autonome</h1>
 <p>Simulez • Projetez • Décidez</p>
-<a class="retour" href="/">RETOUR COCKPIT</a>
+<div style="position:absolute;right:30px;top:15px;display:flex;gap:10px">
+<a class="retour" style="position:static" href="/comparaison">COMPARER</a>
+<button id="vider-historique" style="padding:9px 18px;border:1px solid #ff6677;border-radius:5px;color:#ff6677;background:#071728;font-size:12px;font-weight:700;cursor:pointer">VIDER L'HISTORIQUE</button>
+<a class="retour" style="position:static" href="/">RETOUR COCKPIT</a>
+</div>
 </header>
 <main class="page">
 <h2>HISTORIQUE DES SIMULATIONS</h2>
@@ -753,7 +757,7 @@ tr:hover td{background:#0a1a2a}
 <thead><tr>
 <th>N°</th><th>Date</th><th>Capital initial</th><th>Versement mensuel</th>
 <th>Rendement annuel</th><th>Durée</th><th>Total versé</th>
-<th>Capital final</th><th>Plus-value</th><th>Performance</th>
+<th>Capital final</th><th>Plus-value</th><th>Performance</th><th>Action</th>
 </tr></thead>
 <tbody id="historique-corps"></tbody>
 </table>
@@ -801,12 +805,30 @@ tr:hover td{background:#0a1a2a}
             <td>${euros(sim.capital_final)}</td>
             <td>${euros(sim.gains)}</td>
             <td>${Number(sim.performance || 0).toFixed(2)} %</td>
+            <td><button class="supprimer-simulation" data-index="${index}" style="padding:6px 10px;border:1px solid #ff6677;border-radius:4px;background:#24111a;color:#ff6677;font-weight:700;cursor:pointer">SUPPRIMER</button></td>
         `;
         corps.appendChild(ligne);
     });
 
     document.getElementById("historique-vide").style.display = "none";
     document.getElementById("historique-tableau").style.display = "block";
+
+    document.querySelectorAll(".supprimer-simulation").forEach((bouton) => {
+        bouton.addEventListener("click", function () {
+            if (!confirm("Supprimer cette simulation de l'historique ?")) return;
+            const index = Number(this.dataset.index);
+            historique.splice(index, 1);
+            localStorage.setItem(cle, JSON.stringify(historique));
+            location.reload();
+        });
+    });
+
+    document.getElementById("vider-historique").addEventListener("click", function () {
+        if (!historique.length) return;
+        if (!confirm("Supprimer définitivement toutes les simulations enregistrées ?")) return;
+        localStorage.removeItem(cle);
+        location.reload();
+    });
 })();
 </script>
 </main>
