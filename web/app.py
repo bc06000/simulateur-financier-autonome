@@ -655,7 +655,27 @@ select{width:100%;height:38px;background:#0b2032;color:white;border:1px solid #2
 .ligne{display:flex;justify-content:space-between;gap:20px;padding:9px 4px;border-bottom:1px solid #132d3d;font-size:13px}
 .ligne strong{color:#dffaff}.ligne span{color:white}.vide{text-align:center;color:#7da0ad;padding:35px}.synthese{margin-top:18px;background:#071321;border:1px solid #17384c;border-radius:8px;padding:16px}.synthese h3{text-align:center;color:var(--cyan);margin:0 0 12px}.synthese-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.synthese-carte{background:#0b2032;border:1px solid #1d4a61;border-radius:6px;padding:12px;text-align:center}.synthese-carte strong{display:block;color:#dffaff;font-size:12px;margin-bottom:6px}.synthese-carte span{color:white;font-size:13px}
 @media(max-width:800px){.selection,.colonnes,.synthese-grille{grid-template-columns:1fr}}
-@media print{.actions-entete,.selection{display:none!important}html,body{background:white!important;color:black!important}.entete{background:white!important}.scenario{background:white!important;color:black!important;border:1px solid #777!important}.ligne strong,.ligne span,h2,.scenario h3{color:black!important}}
+@media print{
+    @page{size:A4 landscape;margin:7mm}
+    html,body{width:100%!important;height:auto!important;min-height:0!important;background:white!important;color:black!important;font-size:9px!important}
+    .actions-entete,.selection,.sous{display:none!important}
+    .entete{height:42px!important;padding:5px 12px!important;background:white!important;border-bottom:1px solid #777!important}
+    .entete h1{font-size:14px!important;color:black!important}
+    .entete p{font-size:8px!important;color:black!important;margin-top:2px!important}
+    .page{width:100%!important;max-width:none!important;margin:0!important;padding:6px 0 0!important}
+    h2{margin:0 0 6px!important;font-size:17px!important;color:black!important}
+    .colonnes{grid-template-columns:1fr 1fr!important;gap:8px!important}
+    .scenario{padding:6px 9px!important;background:white!important;color:black!important;border:1px solid #777!important;break-inside:avoid!important;page-break-inside:avoid!important}
+    .scenario h3{margin:0 0 4px!important;font-size:13px!important;color:black!important}
+    .ligne{padding:4px 2px!important;gap:8px!important;font-size:9px!important;line-height:1.15!important;border-bottom:1px solid #ccc!important}
+    .ligne strong,.ligne span{color:black!important}
+    .synthese{margin-top:7px!important;padding:6px!important;background:white!important;color:black!important;border:1px solid #777!important;break-inside:avoid!important;page-break-inside:avoid!important}
+    .synthese h3{margin:0 0 5px!important;font-size:13px!important;color:black!important}
+    .synthese-grille{grid-template-columns:repeat(4,1fr)!important;gap:5px!important}
+    .synthese-carte{padding:5px!important;background:white!important;border:1px solid #999!important}
+    .synthese-carte strong{margin-bottom:3px!important;font-size:8px!important;color:black!important}
+    .synthese-carte span{font-size:8px!important;color:black!important}
+}
 </style>
 </head>
 <body>
