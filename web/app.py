@@ -653,8 +653,8 @@ select{width:100%;height:38px;background:#0b2032;color:white;border:1px solid #2
 .scenario{background:#071321;border:1px solid #17384c;border-radius:8px;padding:14px 18px}
 .scenario h3{text-align:center;color:var(--cyan);margin:0 0 12px}
 .ligne{display:flex;justify-content:space-between;gap:20px;padding:9px 4px;border-bottom:1px solid #132d3d;font-size:13px}
-.ligne strong{color:#dffaff}.ligne span{color:white}.vide{text-align:center;color:#7da0ad;padding:35px}
-@media(max-width:800px){.selection,.colonnes{grid-template-columns:1fr}}
+.ligne strong{color:#dffaff}.ligne span{color:white}.vide{text-align:center;color:#7da0ad;padding:35px}.synthese{margin-top:18px;background:#071321;border:1px solid #17384c;border-radius:8px;padding:16px}.synthese h3{text-align:center;color:var(--cyan);margin:0 0 12px}.synthese-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.synthese-carte{background:#0b2032;border:1px solid #1d4a61;border-radius:6px;padding:12px;text-align:center}.synthese-carte strong{display:block;color:#dffaff;font-size:12px;margin-bottom:6px}.synthese-carte span{color:white;font-size:13px}
+@media(max-width:800px){.selection,.colonnes,.synthese-grille{grid-template-columns:1fr}}
 @media print{.actions-entete,.selection{display:none!important}html,body{background:white!important;color:black!important}.entete{background:white!important}.scenario{background:white!important;color:black!important;border:1px solid #777!important}.ligne strong,.ligne span,h2,.scenario h3{color:black!important}}
 </style>
 </head>
@@ -680,6 +680,15 @@ select{width:100%;height:38px;background:#0b2032;color:white;border:1px solid #2
 <section class="scenario"><h3>SCÉNARIO A</h3><div id="details-a"></div></section>
 <section class="scenario"><h3>SCÉNARIO B</h3><div id="details-b"></div></section>
 </div>
+<section class="synthese">
+<h3>SYNTHÈSE AUTOMATIQUE</h3>
+<div class="synthese-grille">
+<div class="synthese-carte"><strong>Meilleur capital final</strong><span id="resume-capital">-</span></div>
+<div class="synthese-carte"><strong>Meilleure plus-value</strong><span id="resume-gains">-</span></div>
+<div class="synthese-carte"><strong>Meilleure performance</strong><span id="resume-performance">-</span></div>
+<div class="synthese-carte"><strong>Écart de capital final</strong><span id="resume-ecart">-</span></div>
+</div>
+</section>
 </div>
 </main>
 <script>
@@ -701,7 +710,22 @@ select{width:100%;height:38px;background:#0b2032;color:white;border:1px solid #2
  ligne("Rendement annuel",Number(s.taux||0).toFixed(2)+" %")+ligne("Durée",Number(s.duree||0)+" ans")+
  ligne("Total versé",euros(s.total_versements))+ligne("Capital final",euros(s.capital_final))+ligne("Plus-value",euros(s.gains))+
  ligne("Performance",Number(s.performance||0).toFixed(2)+" %");}
- function actualiser(){afficher("details-a",historique[Number(a.value)]);afficher("details-b",historique[Number(b.value)]);}
+ function actualiser(){
+  const sa=historique[Number(a.value)], sb=historique[Number(b.value)];
+  afficher("details-a",sa);
+  afficher("details-b",sb);
+
+  const capitalA=Number(sa.capital_final||0), capitalB=Number(sb.capital_final||0);
+  const gainsA=Number(sa.gains||0), gainsB=Number(sb.gains||0);
+  const perfA=Number(sa.performance||0), perfB=Number(sb.performance||0);
+
+  const gagnant=(va,vb,format)=>va===vb?"Égalité":(va>vb?`Scénario A — ${format(va)}`:`Scénario B — ${format(vb)}`);
+
+  document.getElementById("resume-capital").textContent=gagnant(capitalA,capitalB,euros);
+  document.getElementById("resume-gains").textContent=gagnant(gainsA,gainsB,euros);
+  document.getElementById("resume-performance").textContent=gagnant(perfA,perfB,v=>v.toFixed(2)+" %");
+  document.getElementById("resume-ecart").textContent=euros(Math.abs(capitalA-capitalB));
+ }
  a.addEventListener("change",actualiser);b.addEventListener("change",actualiser);actualiser();
 })();
 </script>
