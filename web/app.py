@@ -630,22 +630,27 @@ html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);fon
 }
 .retour:hover,.imprimer:hover{background:#0c3148}
 @media print{
+    @page{size:A4 portrait;margin:7mm}
     .actions-entete,.selection{display:none!important}
-    html,body{background:white!important;color:black!important}
-    .entete{background:white!important;border-bottom:1px solid #999!important}
-    .entete h1,.entete p,h2,.scenario h3{color:black!important}
-    .page{width:100%!important;padding:15px!important}
-    .scenario{
-        background:white!important;color:black!important;
-        border:1px solid #777!important;break-inside:avoid;
-    }
-    .ligne{border-bottom:1px solid #ccc!important}
+    html,body{width:100%!important;min-height:0!important;margin:0!important;padding:0!important;background:white!important;color:black!important;font-size:9px!important}
+    .entete{height:42px!important;padding:4px 10px!important;background:white!important;border-bottom:1px solid #999!important}
+    .entete h1{color:black!important;font-size:14px!important;line-height:17px!important}
+    .entete p{color:black!important;margin:1px 0 0!important;font-size:8px!important}
+    .page{width:100%!important;max-width:none!important;margin:0!important;padding:7px 0 0!important}
+    h2{color:black!important;font-size:18px!important;line-height:20px!important;margin:0!important}
+    .sous{color:#333!important;margin:2px 0 7px!important;font-size:9px!important}
+    .colonnes{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;break-inside:avoid!important;page-break-inside:avoid!important}
+    .scenario{background:white!important;color:black!important;border:1px solid #777!important;border-radius:5px!important;padding:5px 8px!important;break-inside:avoid!important;page-break-inside:avoid!important}
+    .scenario h3{color:black!important;font-size:12px!important;margin:0 0 3px!important}
+    .ligne{padding:3px 1px!important;border-bottom:1px solid #ccc!important;font-size:8px!important;line-height:11px!important}
     .ligne strong,.ligne span{color:black!important}
-    .sous{color:#333!important}
-    .synthese{background:white!important;color:black!important;border:1px solid #777!important}
-    .synthese h3,.synthese-grille strong,.synthese-grille span{color:black!important}
-    .synthese-grille div{background:white!important;border:1px solid #999!important}
-    .copyright{color:#333!important;margin-top:18px!important}
+    .synthese{margin-top:7px!important;padding:5px 7px!important;background:white!important;color:black!important;border:1px solid #777!important;border-radius:5px!important;break-inside:avoid!important;page-break-inside:avoid!important}
+    .synthese h3{color:black!important;font-size:11px!important;margin:0 0 4px!important}
+    .synthese-grille{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:4px!important}
+    .synthese-grille div{min-height:34px!important;padding:4px 2px!important;background:white!important;border:1px solid #999!important;border-radius:4px!important}
+    .synthese-grille strong{color:black!important;font-size:7px!important;margin-bottom:3px!important}
+    .synthese-grille span{color:black!important;font-size:7px!important}
+    .copyright{color:#333!important;font-size:7px!important;margin:6px 0 0!important;padding:0!important;break-inside:avoid!important;page-break-inside:avoid!important}
 }
 .page{width:min(1180px,96vw);margin:0 auto;padding:20px 0}
 h2{text-align:center;margin:0;color:var(--cyan);font-size:26px}
