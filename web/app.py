@@ -8,9 +8,6 @@ Réutilise le moteur financier et le service IA existants.
 from __future__ import annotations
 
 import sys
-import json
-import logging
-from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, request, render_template_string
@@ -25,31 +22,6 @@ from services.service_ia import ServiceIA
 
 app = Flask(__name__)
 service_ia = ServiceIA()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-)
-journal = logging.getLogger("simulateur_financier")
-
-def enregistrer_utilisation(simulation):
-    """
-    Enregistre chaque simulation validée dans les logs Render.
-    Aucune donnée permettant d'identifier l'utilisateur n'est enregistrée.
-    """
-    try:
-        journal.info(
-            "SIMULATION_UTILISEE | capital_initial=%.2f | "
-            "versement_mensuel=%.2f | rendement_annuel=%.2f%% | "
-            "duree=%s | capital_final=%.2f",
-            float(simulation.capital_initial),
-            float(simulation.versement_mensuel),
-            float(simulation.taux),
-            simulation.duree,
-            float(simulation.capital_final),
-        )
-    except Exception:
-        journal.info("SIMULATION_UTILISEE")
 
 
 def formater_euros(valeur: float) -> str:
@@ -154,245 +126,440 @@ PAGE_HTML = """
 <title>Simulateur Financier Autonome</title>
 <style>
 :root{
-    --fond:#020813;
-    --panneau:#06101f;
-    --cyan:#37e8ff;
-    --cyan2:#9ff8ff;
-    --texte:#f5fbff;
-    --secondaire:#77dbe8;
+    --fond:#101010;
+    --panneau:#2b2b2b;
+    --panneau2:#303030;
+    --bordure:#414141;
+    --bleu:#1995e8;
+    --cyan:#4fc3f7;
+    --texte:#f5f5f5;
+    --secondaire:#b8b8b8;
 }
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
-body{overflow:hidden}
-.cockpit{
+body{
+    margin:0;
     min-height:100vh;
-    position:relative;
-    overflow:hidden;
-    background:
-      radial-gradient(circle at 50% 52%,rgba(0,184,255,.14),transparent 23%),
-      radial-gradient(circle at 50% 52%,rgba(0,85,170,.10),transparent 43%),
-      #020813;
+    background:var(--fond);
+    color:var(--texte);
+    font-family:Arial,Helvetica,sans-serif;
 }
-.entete{
-    height:68px;
-    padding:11px 30px;
-    background:#1d2633;
-    border-bottom:1px solid #27384b;
-}
-.entete h1{margin:0;color:#48bfff;font-size:19px}
-.entete p{margin:4px 0 0;color:#b9d9ed;font-size:12px}
-.entete{position:relative}
-.navigation-web{
-    position:absolute;right:30px;top:15px;display:flex;gap:10px;
-}
-.bouton-comparaison{
-    padding:9px 18px;border:1px solid var(--cyan);
-    border-radius:5px;color:var(--cyan);text-decoration:none;
-    font-size:12px;font-weight:700;background:#071728;
-}
-.bouton-comparaison:hover{background:#0c3148}
-.scene{
-    width:min(1180px,96vw);
-    height:calc(100vh - 68px);
+.page{
+    width:min(1480px,calc(100% - 30px));
     margin:0 auto;
-    position:relative;
-    overflow:hidden;
+    padding:22px 0 50px;
 }
-.orbite{
-    position:absolute;
-    left:50%;top:52%;
-    transform:translate(-50%,-50%);
-    width:360px;height:360px;
-    border:1px solid var(--cyan);
-    border-radius:50%;
-    box-shadow:0 0 25px rgba(55,232,255,.16),inset 0 0 30px rgba(55,232,255,.08);
+h1{
+    margin:0 0 22px;
+    text-align:center;
+    color:var(--cyan);
+    font-size:30px;
+    letter-spacing:1.5px;
 }
-.orbite:before,.orbite:after{
-    content:"";position:absolute;border:1px solid var(--cyan);border-radius:50%;
-    left:50%;top:50%;transform:translate(-50%,-50%);
+.zone-haute{
+    display:grid;
+    grid-template-columns:minmax(0,1.45fr) minmax(360px,.85fr);
+    gap:16px;
 }
-.orbite:before{width:278px;height:278px}
-.orbite:after{width:198px;height:198px}
-.coeur{
-    position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);
-    width:122px;height:122px;border-radius:50%;
-    background:radial-gradient(circle,#eaffff 0 5%,#45e8ff 6% 18%,#148dd9 19% 42%,rgba(0,145,255,.15) 43% 70%,transparent 71%);
-    box-shadow:0 0 45px #18cfff;
+.bloc{
+    background:var(--panneau);
+    border:1px solid var(--bordure);
+    border-radius:14px;
+    padding:22px;
 }
-.rayon{
-    position:absolute;left:50%;top:52%;height:1px;width:255px;background:var(--cyan);
-    transform-origin:left center;opacity:.8;
+.bloc h2{
+    margin:0 0 20px;
+    text-align:center;
+    font-size:24px;
 }
-.r1{transform:rotate(205deg)} .r2{transform:rotate(335deg)}
-.r3{transform:rotate(270deg)} .r4{transform:rotate(25deg)}
-.carte{
-    position:absolute;width:200px;min-height:108px;padding:14px 12px;
-    border:1px solid var(--cyan2);background:rgba(2,8,19,.84);
-    text-align:center;box-shadow:0 0 15px rgba(55,232,255,.05);
+.champs{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
 }
-.carte .titre{color:var(--cyan);font-size:12px;text-transform:uppercase}
-.carte .valeur{margin-top:9px;font-weight:700;font-size:15px}
-.carte .detail{margin-top:9px;color:var(--secondaire);font-size:11px}
-.capital{left:105px;top:24%}.risque{left:50%;top:5%;transform:translateX(-50%)}
-.score{right:105px;top:24%}.rendement{left:105px;bottom:8%}
-.profil{right:105px;bottom:8%}.objectifs{left:50%;bottom:5%;transform:translateX(-50%)}
-.decision{
-    position:absolute;left:50%;bottom:27%;transform:translateX(-50%);
-    width:215px;padding:6px;border:1px solid var(--cyan2);background:#06101f;text-align:center;
-    font-size:12px;color:var(--cyan2);
+label{
+    display:block;
+    margin-bottom:6px;
+    font-size:14px;
 }
-.decision strong{display:block;color:var(--cyan);margin-bottom:3px}
-.commande{
-    position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);
-    width:470px;height:470px;border-radius:50%;
+input{
+    width:100%;
+    height:42px;
+    padding:0 12px;
+    border:1px solid #555;
+    border-radius:8px;
+    background:#333;
+    color:#fff;
+    font-size:15px;
 }
-.formulaire{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:350px;padding:20px;background:rgba(3,12,24,.96);border:1px solid var(--cyan);
-    border-radius:8px;z-index:5;display:none;
+.actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:26px;
 }
-.formulaire.ouvert{display:block}
-.formulaire h2{text-align:center;color:var(--cyan);font-size:18px;margin:0 0 16px}
-.champs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-label{display:block;font-size:11px;color:#9edce7;margin-bottom:4px}
-input{width:100%;height:34px;background:#071728;border:1px solid #25748a;color:white;padding:0 9px;border-radius:4px}
-.actions{display:flex;gap:8px;margin-top:15px}
-button,.reset{flex:1;border:0;padding:10px;background:#0c9bd8;color:white;font-weight:700;border-radius:4px;cursor:pointer;text-align:center;text-decoration:none;font-size:12px}
-.reset{background:#344351}
-.lancer{
-    position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);
-    z-index:4;border:1px solid var(--cyan);background:#071728;color:var(--cyan);
-    width:102px;height:102px;border-radius:50%;font-size:12px;
+button,.bouton-lien{
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:0;
+    border-radius:8px;
+    padding:10px 18px;
+    text-decoration:none;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
 }
-.erreur{position:absolute;left:50%;top:15px;transform:translateX(-50%);z-index:9;background:#4b2020;padding:10px 15px;border-radius:5px}
-.note{position:absolute;bottom:4px;width:100%;text-align:center;color:#477887;font-size:10px}
-@media(max-width:900px){
- .scene{height:850px}.carte{width:180px}.capital,.rendement{left:10px}.score,.profil{right:10px}
+button{background:var(--bleu);color:#fff}
+.bouton-lien{background:#555;color:#fff}
+.erreur{
+    margin-top:18px;
+    padding:12px;
+    border:1px solid #a55;
+    border-radius:8px;
+    background:#3b1e1e;
+    color:#ffc1c1;
 }
-
-@media(max-height:720px){
-    .entete{height:58px;padding:7px 30px}
-    .scene{height:calc(100vh - 58px)}
-    .orbite{width:315px;height:315px}
-    .orbite:before{width:244px;height:244px}
-    .orbite:after{width:174px;height:174px}
-    .coeur{width:106px;height:106px}
-    .rayon{width:225px}
-    .carte{width:188px;min-height:94px;padding:10px}
-    .carte .detail{margin-top:6px}
-    .capital,.rendement{left:125px}
-    .score,.profil{right:125px}
-    .decision{bottom:27%;font-size:11px}
-    .lancer{width:88px;height:88px}
+.resultat-ligne{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:16px;
+    align-items:center;
+    margin:8px 0;
+    padding:12px 14px;
+    border-radius:9px;
+    background:var(--panneau2);
 }
-
+.resultat-ligne strong{font-size:14px}
+.resultat-ligne span{font-size:17px;font-weight:700}
+.graphique{margin-top:16px}
+.graphique h2{margin-bottom:10px}
+.graphique-zone{
+    min-height:270px;
+    padding:8px;
+    border-radius:10px;
+    background:#252525;
+}
+.graphique-zone svg{width:100%;height:270px;display:block}
+.graphique-legende{
+    display:flex;
+    justify-content:space-between;
+    margin-top:6px;
+    color:#aaa;
+    font-size:12px;
+}
+.attente{
+    min-height:220px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:#888;
+}
+.zone-basse{
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);
+    gap:16px;
+    margin-top:16px;
+}
+.projection h2,.ia h2{color:var(--cyan)}
+.projection-sous-titre{
+    margin-top:-10px;
+    margin-bottom:16px;
+    text-align:center;
+    color:#c3c3c3;
+    font-size:14px;
+}
+.table-wrap{
+    max-height:360px;
+    overflow:auto;
+    border-radius:10px;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+    background:#162743;
+}
+th{
+    position:sticky;
+    top:0;
+    padding:10px;
+    background:#087fff;
+    text-align:left;
+}
+td{
+    padding:9px 10px;
+    border-bottom:1px solid #243b5f;
+}
+.carte-ia{
+    margin-bottom:10px;
+    padding:14px;
+    border-radius:10px;
+    background:#353535;
+}
+.carte-ia h3{margin:0 0 8px;font-size:16px}
+.carte-ia p{
+    margin:0;
+    color:#e0e0e0;
+    line-height:1.55;
+    white-space:pre-line;
+}
+.scenarios{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+}
+.scenario{
+    padding:10px;
+    border-radius:8px;
+    background:#292929;
+}
+.scenario strong{
+    display:block;
+    margin-bottom:5px;
+    color:var(--cyan);
+}
+.avertissement{
+    margin:28px auto 0;
+    max-width:960px;
+    color:#888;
+    text-align:center;
+    font-size:12px;
+    line-height:1.55;
+}
+@media(max-width:1050px){
+    .zone-haute,.zone-basse{grid-template-columns:1fr}
+    .champs{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:620px){
+    .page{width:calc(100% - 18px)}
+    .champs,.actions,.scenarios{grid-template-columns:1fr}
+    .bloc{padding:16px}
+    h1{font-size:23px}
+}
 </style>
 </head>
 <body>
-<div class="cockpit">
-<header class="entete">
-<h1>Simulateur financier autonome</h1>
-<p>Simulez • Projetez • Décidez</p>
-<div class="navigation-web">
-<a class="bouton-comparaison" href="/historique">HISTORIQUE</a>
-<a class="bouton-comparaison" href="/comparaison">COMPARAISON</a>
-<a class="bouton-comparaison" href="/contact">NOUS CONTACTER</a>
-</div>
-</header>
+<div class="page">
 
-{% if erreur %}<div class="erreur">{{ erreur }}</div>{% endif %}
+<h1>SIMULATEUR FINANCIER AUTONOME</h1>
 
-<main class="scene">
-<div class="orbite"></div><div class="coeur"></div>
-<div class="rayon r1"></div><div class="rayon r2"></div><div class="rayon r3"></div><div class="rayon r4"></div>
+<div class="zone-haute">
 
-<section class="carte capital">
-<div class="titre">Capital</div>
-<div class="valeur">{{ capital_final if simulation else "0 €" }}</div>
-<div class="detail">Capital final projeté</div>
-</section>
-
-<section class="carte risque">
-<div class="titre">Risque</div>
-<div class="valeur">{{ risque if simulation else "En attente" }}</div>
-<div class="detail">Niveau calculé</div>
-</section>
-
-<section class="carte score">
-<div class="titre">Score IA</div>
-<div class="valeur">{{ score_ia if simulation else "0.0 / 10" }}</div>
-<div class="detail">Évaluation IA</div>
-</section>
-
-<section class="carte rendement">
-<div class="titre">Rendement</div>
-<div class="valeur">{{ performance if simulation else "+0.0 %" }}</div>
-<div class="detail">Performance calculée</div>
-</section>
-
-<section class="carte profil">
-<div class="titre">Profil IA</div>
-<div class="valeur">{{ profil_ia if simulation else "En attente" }}</div>
-<div class="detail">Profil calculé</div>
-</section>
-
-<section class="carte objectifs">
-<div class="titre">Objectifs</div>
-<div class="valeur">{{ duree_resultat if simulation else "En attente" }}</div>
-<div class="detail">Projection long terme</div>
-</section>
-
-<div class="decision">
-<strong>DÉCISION IA</strong>
-{% if simulation %}
-Profil : {{ profil_ia }}<br>
-Capital : {{ capital_final }}<br>
-Confiance : {{ score_ia }}
-{% else %}
-Profil : En attente<br>
-Lancer une simulation<br>
-Confiance : en attente
-{% endif %}
-</div>
-
-<button class="lancer" type="button" onclick="document.getElementById('formulaire').classList.add('ouvert')">
-SIMULER
-</button>
-
-<form id="formulaire" class="formulaire {% if request.method == 'POST' and erreur %}ouvert{% endif %}" method="post">
+<section class="bloc">
 <h2>PARAMÈTRES DE SIMULATION</h2>
+
+<form method="post">
+
 <div class="champs">
-<div><label>Capital initial (€)</label><input type="number" name="capital_initial" min="0" step="100" value="{{ valeurs.capital_initial }}" required></div>
-<div><label>Versement mensuel (€)</label><input type="number" name="versement_mensuel" min="0" step="10" value="{{ valeurs.versement_mensuel }}" required></div>
-<div><label>Rendement annuel (%)</label><input type="number" name="taux_annuel" min="0" max="100" step="0.1" value="{{ valeurs.taux_annuel }}" required></div>
-<div><label>Durée (années)</label><input type="number" name="duree" min="1" max="100" step="1" value="{{ valeurs.duree }}" required></div>
+
+<div>
+<label>Capital initial (€)</label>
+<input type="number" name="capital_initial" min="0" step="100"
+value="{{ valeurs.capital_initial }}" required>
 </div>
-<div class="actions"><button type="submit">CALCULER</button><a class="reset" href="/">RÉINITIALISER</a></div>
+
+<div>
+<label>Versement mensuel (€)</label>
+<input type="number" name="versement_mensuel" min="0" step="10"
+value="{{ valeurs.versement_mensuel }}" required>
+</div>
+
+<div>
+<label>Rendement annuel (%)</label>
+<input type="number" name="taux_annuel" min="0" max="100" step="0.1"
+value="{{ valeurs.taux_annuel }}" required>
+</div>
+
+<div>
+<label>Durée (années)</label>
+<input type="number" name="duree" min="1" max="100" step="1"
+value="{{ valeurs.duree }}" required>
+</div>
+
+</div>
+
+<div class="actions">
+<button type="submit">Calculer</button>
+<a class="bouton-lien" href="/">Réinitialiser</a>
+</div>
+
 </form>
 
-<div class="note">Outil pédagogique de simulation — aucune projection ne constitue une garantie de résultat futur.</div>
-</main>
+{% if erreur %}
+<div class="erreur">{{ erreur }}</div>
+{% endif %}
+
+</section>
+
+<section class="bloc">
+<h2>RÉSULTATS</h2>
+
+<div class="resultat-ligne">
+<strong>CAPITAL FINAL</strong>
+<span>{{ capital_final }}</span>
 </div>
 
-{% if simulation_locale %}
-<script>
-(function () {
-    const simulation = {{ simulation_locale|tojson }};
-    const cle = "simulateur_financier_historique_v1";
-    let historique = [];
+<div class="resultat-ligne">
+<strong>VERSEMENTS</strong>
+<span>{{ total_versements }}</span>
+</div>
 
-    try {
-        historique = JSON.parse(localStorage.getItem(cle) || "[]");
-        if (!Array.isArray(historique)) historique = [];
-    } catch (e) {
-        historique = [];
-    }
+<div class="resultat-ligne">
+<strong>PLUS-VALUE</strong>
+<span>{{ gains }}</span>
+</div>
 
-    historique.push(simulation);
-    localStorage.setItem(cle, JSON.stringify(historique));
-})();
-</script>
+<div class="resultat-ligne">
+<strong>PERFORMANCE</strong>
+<span>{{ performance }}</span>
+</div>
+
+<div class="resultat-ligne">
+<strong>DURÉE</strong>
+<span>{{ duree_resultat }}</span>
+</div>
+
+<div class="resultat-ligne">
+<strong>RENDEMENT</strong>
+<span>{{ rendement_resultat }}</span>
+</div>
+
+</section>
+</div>
+
+<section class="bloc graphique">
+<h2>ÉVOLUTION DU CAPITAL</h2>
+
+{% if simulation %}
+
+<div class="graphique-zone">
+<svg viewBox="0 0 1000 260" preserveAspectRatio="none">
+<line x1="20" y1="240" x2="980" y2="240" stroke="#666" stroke-width="1"/>
+<polyline
+points="{{ graphique_points }}"
+fill="none"
+stroke="#1995e8"
+stroke-width="4"
+vector-effect="non-scaling-stroke"
+/>
+</svg>
+</div>
+
+<div class="graphique-legende">
+<span>Départ</span>
+<span>{{ duree_resultat }}</span>
+</div>
+
+{% else %}
+
+<div class="attente">
+Lancez une simulation pour afficher l'évolution du capital.
+</div>
+
 {% endif %}
+
+</section>
+
+<div class="zone-basse">
+
+<section class="bloc projection">
+<h2>📊 PROJECTION DU CAPITAL</h2>
+
+<div class="projection-sous-titre">
+Projection annuelle de l'investissement
+</div>
+
+{% if projection_annuelle %}
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Année</th>
+<th>Capital</th>
+<th>Gain</th>
+</tr>
+</thead>
+
+<tbody>
+{% for ligne in projection_annuelle %}
+<tr>
+<td>{{ ligne.annee }}</td>
+<td>{{ ligne.capital }}</td>
+<td>{{ ligne.gain }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% else %}
+
+<div class="attente">
+La projection annuelle apparaîtra ici.
+</div>
+
+{% endif %}
+
+</section>
+
+<section class="bloc ia">
+<h2>IA FINANCIÈRE</h2>
+
+<div class="carte-ia">
+<h3>🟢 Analyse</h3>
+<p>{{ analyse }}</p>
+</div>
+
+<div class="carte-ia">
+<h3>💡 Lecture descriptive</h3>
+<p>{{ conseils }}</p>
+</div>
+
+<div class="carte-ia">
+<h3>📈 Scénarios V2</h3>
+<div class="scenarios">
+
+<div class="scenario">
+<strong>Prudent</strong>
+{{ scenario_prudent }}
+</div>
+
+<div class="scenario">
+<strong>Normal</strong>
+{{ scenario_normal }}
+</div>
+
+<div class="scenario">
+<strong>Optimiste</strong>
+{{ scenario_optimiste }}
+</div>
+
+</div>
+</div>
+
+<div class="carte-ia">
+<h3>📊 Indicateurs</h3>
+<p>{{ indicateurs }}</p>
+</div>
+
+<div class="carte-ia">
+<h3>⚠ Alertes</h3>
+<p>{{ alertes }}</p>
+</div>
+
+</section>
+
+</div>
+
+<div class="avertissement">
+Outil pédagogique de simulation. Les résultats dépendent exclusivement
+des hypothèses saisies et ne constituent ni une recommandation financière
+ni une garantie de résultat futur.
+</div>
+
+</div>
 </body>
 </html>
 """
@@ -476,8 +643,6 @@ def accueil():
                 duree,
             )
 
-            enregistrer_utilisation(simulation)
-
             scenarios = {
                 "prudent": CalculProjection.calculer(
                     capital_initial,
@@ -527,15 +692,6 @@ def accueil():
 
         rendement_resultat = f"{simulation.taux:.2f} %"
 
-        risque = calculer_risque(simulation)
-        score_ia = f"{min(10.0, max(0.0, 5.0 + simulation.performance / 20)):.1f} / 10"
-        if simulation.performance >= 50:
-            profil_ia = "Croissance élevée"
-        elif simulation.performance >= 20:
-            profil_ia = "Croissance modérée"
-        else:
-            profil_ia = "Prudent"
-
         analyse = analyse_ia.analyse
         conseils = analyse_ia.conseils
 
@@ -578,10 +734,6 @@ def accueil():
         duree_resultat = "0 an"
         rendement_resultat = "0,00 %"
 
-        risque = "En attente"
-        score_ia = "0.0 / 10"
-        profil_ia = "En attente"
-
         analyse = "Lancez une simulation."
         conseils = "Les informations descriptives apparaîtront ici."
 
@@ -618,335 +770,7 @@ def accueil():
         scenario_optimiste=scenario_optimiste,
         indicateurs=indicateurs,
         alertes=alertes,
-        risque=risque,
-        score_ia=score_ia,
-        profil_ia=profil_ia,
-        simulation_locale=(
-            simulation.to_dict()
-            if simulation
-            else None
-        ),
     )
-
-
-COMPARAISON_HTML = """
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comparaison de scénarios</title>
-<style>
-:root{--fond:#020813;--panneau:#06101f;--cyan:#37e8ff;--cyan2:#9ff8ff;--texte:#f5fbff;--secondaire:#77dbe8}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
-.entete{height:68px;padding:11px 30px;background:#1d2633;border-bottom:1px solid #27384b;position:relative}
-.entete h1{margin:0;color:#48bfff;font-size:19px}.entete p{margin:4px 0 0;color:#b9d9ed;font-size:12px}
-.actions-entete{position:absolute;right:30px;top:15px;display:flex;gap:10px}
-.retour,.imprimer{padding:9px 18px;border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);text-decoration:none;font-size:12px;font-weight:700;background:#071728;cursor:pointer;font-family:inherit}
-.page{width:min(1180px,96vw);margin:0 auto;padding:20px 0}
-h2{text-align:center;margin:0;color:var(--cyan);font-size:26px}.sous{text-align:center;color:#b9d9ed;margin:6px 0 18px}
-.selection{display:grid;grid-template-columns:1fr 1fr;gap:18px;background:#071321;border:1px solid #17384c;border-radius:8px;padding:16px;margin-bottom:16px}
-.selection label{display:block;color:var(--cyan);font-size:12px;font-weight:700;margin-bottom:6px}
-select{width:100%;height:38px;background:#0b2032;color:white;border:1px solid #28718d;border-radius:5px;padding:0 10px}
-.colonnes{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.scenario{background:#071321;border:1px solid #17384c;border-radius:8px;padding:14px 18px}
-.scenario h3{text-align:center;color:var(--cyan);margin:0 0 12px}
-.ligne{display:flex;justify-content:space-between;gap:20px;padding:9px 4px;border-bottom:1px solid #132d3d;font-size:13px}
-.ligne strong{color:#dffaff}.ligne span{color:white}.vide{text-align:center;color:#7da0ad;padding:35px}.synthese{margin-top:18px;background:#071321;border:1px solid #17384c;border-radius:8px;padding:16px}.synthese h3{text-align:center;color:var(--cyan);margin:0 0 12px}.synthese-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.synthese-carte{background:#0b2032;border:1px solid #1d4a61;border-radius:6px;padding:12px;text-align:center}.synthese-carte strong{display:block;color:#dffaff;font-size:12px;margin-bottom:6px}.synthese-carte span{color:white;font-size:13px}
-@media(max-width:800px){.selection,.colonnes,.synthese-grille{grid-template-columns:1fr}}
-@media print{
-    @page{size:A4 landscape;margin:7mm}
-    html,body{width:100%!important;height:auto!important;min-height:0!important;background:white!important;color:black!important;font-size:9px!important}
-    .actions-entete,.selection,.sous{display:none!important}
-    .entete{height:42px!important;padding:5px 12px!important;background:white!important;border-bottom:1px solid #777!important}
-    .entete h1{font-size:14px!important;color:black!important}
-    .entete p{font-size:8px!important;color:black!important;margin-top:2px!important}
-    .page{width:100%!important;max-width:none!important;margin:0!important;padding:6px 0 0!important}
-    h2{margin:0 0 6px!important;font-size:17px!important;color:black!important}
-    .colonnes{grid-template-columns:1fr 1fr!important;gap:8px!important}
-    .scenario{padding:6px 9px!important;background:white!important;color:black!important;border:1px solid #777!important;break-inside:avoid!important;page-break-inside:avoid!important}
-    .scenario h3{margin:0 0 4px!important;font-size:13px!important;color:black!important}
-    .ligne{padding:4px 2px!important;gap:8px!important;font-size:9px!important;line-height:1.15!important;border-bottom:1px solid #ccc!important}
-    .ligne strong,.ligne span{color:black!important}
-    .synthese{margin-top:7px!important;padding:6px!important;background:white!important;color:black!important;border:1px solid #777!important;break-inside:avoid!important;page-break-inside:avoid!important}
-    .synthese h3{margin:0 0 5px!important;font-size:13px!important;color:black!important}
-    .synthese-grille{grid-template-columns:repeat(4,1fr)!important;gap:5px!important}
-    .synthese-carte{padding:5px!important;background:white!important;border:1px solid #999!important}
-    .synthese-carte strong{margin-bottom:3px!important;font-size:8px!important;color:black!important}
-    .synthese-carte span{font-size:8px!important;color:black!important}
-}
-</style>
-</head>
-<body>
-<header class="entete">
-<h1>Simulateur financier autonome</h1>
-<p>Simulez • Projetez • Décidez</p>
-<div class="actions-entete">
-<button class="imprimer" type="button" onclick="window.print()">IMPRIMER</button>
-<a class="retour" href="/">RETOUR COCKPIT</a>
-</div>
-</header>
-<main class="page">
-<h2>COMPARAISON DE SCÉNARIOS</h2>
-<div class="sous">Comparez deux simulations enregistrées</div>
-<div id="comparaison-vide" class="scenario vide" style="display:none">Il faut au moins deux simulations enregistrées dans l'historique.</div>
-<div id="comparaison-contenu" style="display:none">
-<div class="selection">
-<div><label>SCÉNARIO A</label><select id="scenario-a"></select></div>
-<div><label>SCÉNARIO B</label><select id="scenario-b"></select></div>
-</div>
-<div class="colonnes">
-<section class="scenario"><h3>SCÉNARIO A</h3><div id="details-a"></div></section>
-<section class="scenario"><h3>SCÉNARIO B</h3><div id="details-b"></div></section>
-</div>
-<section class="synthese">
-<h3>SYNTHÈSE AUTOMATIQUE</h3>
-<div class="synthese-grille">
-<div class="synthese-carte"><strong>Meilleur capital final</strong><span id="resume-capital">-</span></div>
-<div class="synthese-carte"><strong>Meilleure plus-value</strong><span id="resume-gains">-</span></div>
-<div class="synthese-carte"><strong>Meilleure performance</strong><span id="resume-performance">-</span></div>
-<div class="synthese-carte"><strong>Écart de capital final</strong><span id="resume-ecart">-</span></div>
-</div>
-</section>
-</div>
-</main>
-<script>
-(function(){
- const cle="simulateur_financier_historique_v1";
- let historique=[];
- try{historique=JSON.parse(localStorage.getItem(cle)||"[]");if(!Array.isArray(historique))historique=[];}catch(e){historique=[];}
- const vide=document.getElementById("comparaison-vide"),contenu=document.getElementById("comparaison-contenu");
- if(historique.length<2){vide.style.display="block";return;}
- contenu.style.display="block";
- const a=document.getElementById("scenario-a"),b=document.getElementById("scenario-b");
- const euros=v=>Number(v||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
- const dateSim=s=>{if(!s.date_creation)return "-";const d=new Date(s.date_creation);return Number.isNaN(d.getTime())?"-":d.toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});};
- historique.forEach((s,i)=>{const t=`${i+1} - ${dateSim(s)} - ${euros(s.capital_final)}`;const oa=document.createElement("option"),ob=document.createElement("option");oa.value=ob.value=String(i);oa.textContent=ob.textContent=t;a.appendChild(oa);b.appendChild(ob);});
- a.value="0";b.value="1";
- const ligne=(l,v)=>`<div class="ligne"><strong>${l}</strong><span>${v}</span></div>`;
- function afficher(id,s){document.getElementById(id).innerHTML=
- ligne("Date",dateSim(s))+ligne("Capital initial",euros(s.capital_initial))+ligne("Versement mensuel",euros(s.versement_mensuel))+
- ligne("Rendement annuel",Number(s.taux||0).toFixed(2)+" %")+ligne("Durée",Number(s.duree||0)+" ans")+
- ligne("Total versé",euros(s.total_versements))+ligne("Capital final",euros(s.capital_final))+ligne("Plus-value",euros(s.gains))+
- ligne("Performance",Number(s.performance||0).toFixed(2)+" %");}
- function actualiser(){
-  const sa=historique[Number(a.value)], sb=historique[Number(b.value)];
-  afficher("details-a",sa);
-  afficher("details-b",sb);
-
-  const capitalA=Number(sa.capital_final||0), capitalB=Number(sb.capital_final||0);
-  const gainsA=Number(sa.gains||0), gainsB=Number(sb.gains||0);
-  const perfA=Number(sa.performance||0), perfB=Number(sb.performance||0);
-
-  const gagnant=(va,vb,format)=>va===vb?"Égalité":(va>vb?`Scénario A — ${format(va)}`:`Scénario B — ${format(vb)}`);
-
-  document.getElementById("resume-capital").textContent=gagnant(capitalA,capitalB,euros);
-  document.getElementById("resume-gains").textContent=gagnant(gainsA,gainsB,euros);
-  document.getElementById("resume-performance").textContent=gagnant(perfA,perfB,v=>v.toFixed(2)+" %");
-  document.getElementById("resume-ecart").textContent=euros(Math.abs(capitalA-capitalB));
- }
- a.addEventListener("change",actualiser);b.addEventListener("change",actualiser);actualiser();
-})();
-</script>
-</body>
-</html>
-"""
-
-
-@app.route("/comparaison")
-def comparaison():
-    return render_template_string(COMPARAISON_HTML)
-
-
-HISTORIQUE_HTML = """
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Historique des simulations</title>
-<style>
-:root{--fond:#020813;--panneau:#06101f;--cyan:#37e8ff;--texte:#f5fbff}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
-.entete{height:68px;padding:11px 30px;background:#1d2633;border-bottom:1px solid #27384b;position:relative}
-.entete h1{margin:0;color:#48bfff;font-size:19px}.entete p{margin:4px 0 0;color:#b9d9ed;font-size:12px}
-.retour{position:absolute;right:30px;top:15px;padding:9px 18px;border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);text-decoration:none;font-size:12px;font-weight:700;background:#071728}
-.page{width:min(1500px,96vw);margin:0 auto;padding:24px 0}
-h2{text-align:center;color:var(--cyan);font-size:26px;margin:0 0 20px}
-.tableau{overflow:auto;border:1px solid #17384c;border-radius:8px;background:#071321}
-table{width:100%;border-collapse:collapse;min-width:1050px}
-th{background:#0b2032;color:var(--cyan);text-align:left;padding:12px 10px;font-size:12px}
-td{padding:11px 10px;border-top:1px solid #132d3d;font-size:12px;white-space:nowrap}
-tr:hover td{background:#0a1a2a}
-.vide{text-align:center;padding:45px;color:#7da0ad}
-</style>
-</head>
-<body>
-<header class="entete">
-<h1>Simulateur financier autonome</h1>
-<p>Simulez • Projetez • Décidez</p>
-<div style="position:absolute;right:30px;top:15px;display:flex;gap:10px">
-<a class="retour" style="position:static" href="/comparaison">COMPARER</a>
-<button id="vider-historique" style="padding:9px 18px;border:1px solid #ff6677;border-radius:5px;color:#ff6677;background:#071728;font-size:12px;font-weight:700;cursor:pointer">VIDER L'HISTORIQUE</button>
-<a class="retour" style="position:static" href="/">RETOUR COCKPIT</a>
-</div>
-</header>
-<main class="page">
-<h2>HISTORIQUE DES SIMULATIONS</h2>
-<div id="historique-vide" class="vide">Aucune simulation enregistrée.</div>
-<div id="historique-tableau" class="tableau" style="display:none">
-<table>
-<thead><tr>
-<th>N°</th><th>Date</th><th>Capital initial</th><th>Versement mensuel</th>
-<th>Rendement annuel</th><th>Durée</th><th>Total versé</th>
-<th>Capital final</th><th>Plus-value</th><th>Performance</th><th>Action</th>
-</tr></thead>
-<tbody id="historique-corps"></tbody>
-</table>
-</div>
-
-<script>
-(function () {
-    const cle = "simulateur_financier_historique_v1";
-    let historique = [];
-
-    try {
-        historique = JSON.parse(localStorage.getItem(cle) || "[]");
-        if (!Array.isArray(historique)) historique = [];
-    } catch (e) {
-        historique = [];
-    }
-
-    if (!historique.length) return;
-
-    const euros = valeur =>
-        Number(valeur || 0).toLocaleString("fr-FR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }) + " €";
-
-    const corps = document.getElementById("historique-corps");
-
-    historique.forEach((sim, index) => {
-        const date = sim.date_creation
-            ? new Date(sim.date_creation).toLocaleString("fr-FR", {
-                day:"2-digit", month:"2-digit", year:"numeric",
-                hour:"2-digit", minute:"2-digit"
-              })
-            : "-";
-
-        const ligne = document.createElement("tr");
-        ligne.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${date}</td>
-            <td>${euros(sim.capital_initial)}</td>
-            <td>${euros(sim.versement_mensuel)}</td>
-            <td>${Number(sim.taux || 0).toFixed(2)} %</td>
-            <td>${sim.duree || 0} ans</td>
-            <td>${euros(sim.total_versements)}</td>
-            <td>${euros(sim.capital_final)}</td>
-            <td>${euros(sim.gains)}</td>
-            <td>${Number(sim.performance || 0).toFixed(2)} %</td>
-            <td><button class="supprimer-simulation" data-index="${index}" style="padding:6px 10px;border:1px solid #ff6677;border-radius:4px;background:#24111a;color:#ff6677;font-weight:700;cursor:pointer">SUPPRIMER</button></td>
-        `;
-        corps.appendChild(ligne);
-    });
-
-    document.getElementById("historique-vide").style.display = "none";
-    document.getElementById("historique-tableau").style.display = "block";
-
-    document.querySelectorAll(".supprimer-simulation").forEach((bouton) => {
-        bouton.addEventListener("click", function () {
-            if (!confirm("Supprimer cette simulation de l'historique ?")) return;
-            const index = Number(this.dataset.index);
-            historique.splice(index, 1);
-            localStorage.setItem(cle, JSON.stringify(historique));
-            location.reload();
-        });
-    });
-
-    document.getElementById("vider-historique").addEventListener("click", function () {
-        if (!historique.length) return;
-        if (!confirm("Supprimer définitivement toutes les simulations enregistrées ?")) return;
-        localStorage.removeItem(cle);
-        location.reload();
-    });
-})();
-</script>
-</main>
-</body>
-</html>
-"""
-
-
-CONTACT_HTML = """
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nous contacter</title>
-<style>
-:root{--fond:#020813;--panneau:#06101f;--cyan:#37e8ff;--texte:#f5fbff}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
-.entete{height:68px;padding:11px 30px;background:#1d2633;border-bottom:1px solid #27384b;position:relative}
-.entete h1{margin:0;color:#48bfff;font-size:19px}.entete p{margin:4px 0 0;color:#b9d9ed;font-size:12px}
-.retour{position:absolute;right:30px;top:15px;padding:9px 18px;border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);text-decoration:none;font-size:12px;font-weight:700;background:#071728}
-.page{width:min(760px,92vw);margin:0 auto;padding:45px 0}
-h2{text-align:center;color:var(--cyan);font-size:28px;margin:0 0 10px}
-.intro{text-align:center;color:#b9d9ed;margin-bottom:25px}
-.carte{background:#071321;border:1px solid #17384c;border-radius:10px;padding:25px}
-label{display:block;color:var(--cyan);font-weight:700;font-size:12px;margin:15px 0 6px}
-input,textarea{width:100%;background:#0b2032;color:white;border:1px solid #28718d;border-radius:5px;padding:11px;font:inherit}
-textarea{min-height:150px;resize:vertical}
-button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);border-radius:5px;background:#0c3148;color:var(--cyan);font-weight:800;cursor:pointer}
-.info{text-align:center;color:#7da0ad;font-size:12px;margin-top:18px}
-</style>
-</head>
-<body>
-<header class="entete">
-<h1>Simulateur financier autonome</h1>
-<p>Simulez • Projetez • Décidez</p>
-<a class="retour" href="/">RETOUR COCKPIT</a>
-</header>
-<main class="page">
-<h2>NOUS CONTACTER</h2>
-<div class="intro">Une question ou une remarque concernant le simulateur ?</div>
-<div class="carte">
-<form action="mailto:" method="post" enctype="text/plain">
-<label>Nom</label>
-<input type="text" name="Nom" required>
-<label>Adresse e-mail</label>
-<input type="email" name="Email" required>
-<label>Objet</label>
-<input type="text" name="Objet" required>
-<label>Message</label>
-<textarea name="Message" required></textarea>
-<button type="submit">PRÉPARER LE MESSAGE</button>
-</form>
-<div class="info">Le bouton ouvre le logiciel de messagerie configuré sur l'ordinateur.</div>
-</div>
-</main>
-</body>
-</html>
-"""
-
-
-@app.route("/historique")
-def historique():
-    return render_template_string(
-        HISTORIQUE_HTML,
-        simulations=[],
-        euros=formater_euros,
-    )
-
-
-@app.route("/contact")
-def contact():
-    return render_template_string(CONTACT_HTML)
 
 
 if __name__ == "__main__":
