@@ -10,9 +10,11 @@ from __future__ import annotations
 import os
 import sys
 import uuid
+import csv
+from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, request, render_template_string, session
+from flask import Flask, request, render_template_string, session, Response
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 
@@ -30,6 +32,57 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 
 service_ia = ServiceIA()
+
+
+# --- Statistiques de fréquentation ---
+DOSSIER_STATS = RACINE_PROJET / "donnees"
+FICHIER_VISITES = DOSSIER_STATS / "statistiques_visites.csv"
+ENTETES_VISITES = ["date_utc", "heure_utc", "session", "origine", "appareil", "action", "chemin"]
+
+def _origine_visite():
+    referer = (request.referrer or "").lower()
+    if "facebook.com" in referer or "fbclid" in request.args: return "Facebook"
+    if "google." in referer: return "Google"
+    if referer: return "Autre site"
+    return "Direct"
+
+def _appareil_visite():
+    agent = (request.headers.get("User-Agent") or "").lower()
+    if "bot" in agent or "crawler" in agent or "spider" in agent: return "Robot"
+    if "android" in agent: return "Android"
+    if "iphone" in agent or "ipad" in agent: return "iPhone/iPad"
+    if "windows" in agent: return "Windows"
+    if "macintosh" in agent or "mac os" in agent: return "Mac"
+    if "linux" in agent: return "Linux"
+    return "Autre"
+
+def enregistrer_visite(action):
+    appareil = _appareil_visite()
+    if appareil == "Robot": return
+    identifiant = session.get("stat_session")
+    if not identifiant:
+        identifiant = uuid.uuid4().hex[:12]
+        session["stat_session"] = identifiant
+    maintenant = datetime.now(timezone.utc)
+    DOSSIER_STATS.mkdir(parents=True, exist_ok=True)
+    nouveau = not FICHIER_VISITES.exists()
+    with FICHIER_VISITES.open("a", newline="", encoding="utf-8-sig") as fichier:
+        writer = csv.writer(fichier, delimiter=";")
+        if nouveau: writer.writerow(ENTETES_VISITES)
+        writer.writerow([maintenant.strftime("%d/%m/%Y"), maintenant.strftime("%H:%M:%S"),
+                         identifiant, _origine_visite(), appareil, action, request.path])
+
+def enregistrer_ouverture_unique():
+    if not session.get("visite_comptee"):
+        enregistrer_visite("Ouverture")
+        session["visite_comptee"] = True
+
+@app.route("/statistiques/telecharger")
+def telecharger_statistiques():
+    contenu = (FICHIER_VISITES.read_text(encoding="utf-8-sig")
+               if FICHIER_VISITES.exists() else ";".join(ENTETES_VISITES) + "\n")
+    return Response(contenu, mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=statistiques_visites.csv"})
 
 
 def obtenir_service_projection_utilisateur():
@@ -377,6 +430,7 @@ SIMULER
     methods=["GET", "POST"],
 )
 def accueil():
+    enregistrer_ouverture_unique()
     service_projection = obtenir_service_projection_utilisateur()
 
     simulation = None
@@ -453,6 +507,7 @@ def accueil():
             )
 
             service_projection.ajouter_simulation(simulation)
+            enregistrer_visite("Simulation")
 
             scenarios = {
                 "prudent": CalculProjection.calculer(
