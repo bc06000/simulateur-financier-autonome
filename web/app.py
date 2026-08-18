@@ -14,6 +14,7 @@ import csv
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from flask import Flask, request, render_template_string, session, Response
 
@@ -187,11 +188,11 @@ td{padding:10px;border-top:1px solid #132d3d;font-size:12px;white-space:nowrap}
 {% if lignes %}
 <div class="tableau">
 <table>
-<thead><tr><th>Date UTC</th><th>Heure UTC</th><th>Session</th><th>Origine</th><th>Appareil</th><th>Action</th><th>Chemin</th></tr></thead>
+<thead><tr><th>Date France</th><th>Heure France</th><th>Session</th><th>Origine</th><th>Appareil</th><th>Action</th><th>Chemin</th></tr></thead>
 <tbody>
 {% for ligne in lignes %}
 <tr>
-<td>{{ ligne.date_utc }}</td><td>{{ ligne.heure_utc }}</td><td>{{ ligne.session }}</td>
+<td>{{ ligne.date_france }}</td><td>{{ ligne.heure_france }}</td><td>{{ ligne.session }}</td>
 <td>{{ ligne.origine }}</td><td>{{ ligne.appareil }}</td><td>{{ ligne.action }}</td><td>{{ ligne.chemin }}</td>
 </tr>
 {% endfor %}
@@ -221,9 +222,40 @@ def admin_statistiques():
         with FICHIER_VISITES.open("r", newline="", encoding="utf-8-sig") as fichier:
             lignes = list(csv.DictReader(fichier, delimiter=";"))
 
+    fuseau_france = ZoneInfo("Europe/Paris")
+
+    for ligne in lignes:
+        try:
+            date_heure_utc = datetime.strptime(
+                f"{ligne.get('date_utc', '')} {ligne.get('heure_utc', '')}",
+                "%d/%m/%Y %H:%M:%S",
+            ).replace(tzinfo=timezone.utc)
+
+            date_heure_france = date_heure_utc.astimezone(
+                fuseau_france
+            )
+
+            ligne["date_france"] = date_heure_france.strftime(
+                "%d/%m/%Y"
+            )
+            ligne["heure_france"] = date_heure_france.strftime(
+                "%H:%M:%S"
+            )
+        except (TypeError, ValueError):
+            ligne["date_france"] = ligne.get("date_utc", "")
+            ligne["heure_france"] = ligne.get("heure_utc", "")
+
     lignes.reverse()
-    sessions = {ligne.get("session", "") for ligne in lignes if ligne.get("session")}
-    total_simulations = sum(1 for ligne in lignes if ligne.get("action") == "Simulation")
+    sessions = {
+        ligne.get("session", "")
+        for ligne in lignes
+        if ligne.get("session")
+    }
+    total_simulations = sum(
+        1
+        for ligne in lignes
+        if ligne.get("action") == "Simulation"
+    )
 
     return render_template_string(
         ADMIN_STATISTIQUES_HTML,
