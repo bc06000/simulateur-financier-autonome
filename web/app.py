@@ -68,6 +68,9 @@ def _appareil_visite():
     return "Autre"
 
 def enregistrer_visite(action):
+    if session.get("stats_admin"):
+        return
+
     appareil = _appareil_visite()
     if appareil == "Robot": return
     identifiant = session.get("stat_session")
@@ -216,6 +219,8 @@ def admin_statistiques():
             status=401,
             headers={"WWW-Authenticate": 'Basic realm="Statistiques administrateur"'},
         )
+
+    session["stats_admin"] = True
 
     lignes = []
     if FICHIER_VISITES.exists():
