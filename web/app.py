@@ -141,6 +141,98 @@ def telecharger_statistiques():
     )
 
 
+
+ADMIN_STATISTIQUES_HTML = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistiques administrateur</title>
+<style>
+:root{--fond:#020813;--panneau:#071321;--cyan:#37e8ff;--texte:#f5fbff}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
+.entete{padding:18px 30px;background:#1d2633;border-bottom:1px solid #27384b;display:flex;justify-content:space-between;align-items:center}
+.entete h1{margin:0;color:#48bfff;font-size:20px}
+.actions{display:flex;gap:10px}
+.bouton{padding:9px 16px;border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);text-decoration:none;font-size:12px;font-weight:700;background:#071728}
+.page{width:min(1450px,96vw);margin:0 auto;padding:25px 0}
+.resume{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.carte{background:var(--panneau);border:1px solid #17384c;border-radius:8px;padding:18px;text-align:center}
+.carte strong{display:block;color:var(--cyan);font-size:28px;margin-bottom:5px}
+.carte span{color:#b9d9ed;font-size:12px}
+.tableau{overflow:auto;border:1px solid #17384c;border-radius:8px;background:var(--panneau)}
+table{width:100%;border-collapse:collapse;min-width:950px}
+th{background:#0b2032;color:var(--cyan);text-align:left;padding:12px 10px;font-size:12px}
+td{padding:10px;border-top:1px solid #132d3d;font-size:12px;white-space:nowrap}
+.vide{text-align:center;padding:40px;color:#7da0ad}
+@media(max-width:700px){.resume{grid-template-columns:1fr}.entete{align-items:flex-start;gap:12px;flex-direction:column}}
+</style>
+</head>
+<body>
+<header class="entete">
+<h1>STATISTIQUES DE FRÉQUENTATION</h1>
+<div class="actions">
+<a class="bouton" href="/statistiques/telecharger">TÉLÉCHARGER CSV</a>
+<a class="bouton" href="/">RETOUR COCKPIT</a>
+</div>
+</header>
+<main class="page">
+<div class="resume">
+<div class="carte"><strong>{{ total_lignes }}</strong><span>ÉVÉNEMENTS</span></div>
+<div class="carte"><strong>{{ total_sessions }}</strong><span>VISITEURS / SESSIONS</span></div>
+<div class="carte"><strong>{{ total_simulations }}</strong><span>SIMULATIONS</span></div>
+</div>
+{% if lignes %}
+<div class="tableau">
+<table>
+<thead><tr><th>Date UTC</th><th>Heure UTC</th><th>Session</th><th>Origine</th><th>Appareil</th><th>Action</th><th>Chemin</th></tr></thead>
+<tbody>
+{% for ligne in lignes %}
+<tr>
+<td>{{ ligne.date_utc }}</td><td>{{ ligne.heure_utc }}</td><td>{{ ligne.session }}</td>
+<td>{{ ligne.origine }}</td><td>{{ ligne.appareil }}</td><td>{{ ligne.action }}</td><td>{{ ligne.chemin }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<div class="vide">Aucune statistique enregistrée.</div>
+{% endif %}
+</main>
+</body>
+</html>
+"""
+
+
+@app.route("/admin/statistiques")
+def admin_statistiques():
+    if not _identifiants_statistiques_valides():
+        return Response(
+            "Accès administrateur requis.",
+            status=401,
+            headers={"WWW-Authenticate": 'Basic realm="Statistiques administrateur"'},
+        )
+
+    lignes = []
+    if FICHIER_VISITES.exists():
+        with FICHIER_VISITES.open("r", newline="", encoding="utf-8-sig") as fichier:
+            lignes = list(csv.DictReader(fichier, delimiter=";"))
+
+    lignes.reverse()
+    sessions = {ligne.get("session", "") for ligne in lignes if ligne.get("session")}
+    total_simulations = sum(1 for ligne in lignes if ligne.get("action") == "Simulation")
+
+    return render_template_string(
+        ADMIN_STATISTIQUES_HTML,
+        lignes=lignes,
+        total_lignes=len(lignes),
+        total_sessions=len(sessions),
+        total_simulations=total_simulations,
+    )
+
 def obtenir_service_projection_utilisateur():
     return ServiceProjection()
 
