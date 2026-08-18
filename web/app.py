@@ -11,6 +11,7 @@ import os
 import sys
 import uuid
 import csv
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,6 +33,15 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 
 service_ia = ServiceIA()
+
+ADMIN_STATS_USER = os.environ.get(
+    "ADMIN_STATS_USER",
+    "admin",
+)
+ADMIN_STATS_PASSWORD = os.environ.get(
+    "ADMIN_STATS_PASSWORD",
+    "",
+)
 
 
 # --- Statistiques de fréquentation ---
@@ -77,12 +87,58 @@ def enregistrer_ouverture_unique():
         enregistrer_visite("Ouverture")
         session["visite_comptee"] = True
 
+def _identifiants_statistiques_valides():
+    autorisation = request.authorization
+
+    if not ADMIN_STATS_PASSWORD:
+        return False
+
+    if not autorisation:
+        return False
+
+    utilisateur_valide = secrets.compare_digest(
+        autorisation.username or "",
+        ADMIN_STATS_USER,
+    )
+    mot_de_passe_valide = secrets.compare_digest(
+        autorisation.password or "",
+        ADMIN_STATS_PASSWORD,
+    )
+
+    return utilisateur_valide and mot_de_passe_valide
+
+
 @app.route("/statistiques/telecharger")
 def telecharger_statistiques():
-    contenu = (FICHIER_VISITES.read_text(encoding="utf-8-sig")
-               if FICHIER_VISITES.exists() else ";".join(ENTETES_VISITES) + "\n")
-    return Response(contenu, mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": "attachment; filename=statistiques_visites.csv"})
+    if not _identifiants_statistiques_valides():
+        return Response(
+            "Accès administrateur requis.",
+            status=401,
+            headers={
+                "WWW-Authenticate": (
+                    'Basic realm="Statistiques administrateur"'
+                )
+            },
+        )
+
+    contenu = (
+        FICHIER_VISITES.read_text(
+            encoding="utf-8-sig"
+        )
+        if FICHIER_VISITES.exists()
+        else ";".join(ENTETES_VISITES) + "\n"
+    )
+
+    return Response(
+        contenu,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                "filename=statistiques_visites.csv"
+            )
+        },
+    )
 
 
 def obtenir_service_projection_utilisateur():
