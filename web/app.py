@@ -11,10 +11,8 @@ import os
 import sys
 import uuid
 import csv
-import secrets
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from flask import Flask, request, render_template_string, session, Response
 
@@ -34,15 +32,6 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 
 service_ia = ServiceIA()
-
-ADMIN_STATS_USER = os.environ.get(
-    "ADMIN_STATS_USER",
-    "admin",
-)
-ADMIN_STATS_PASSWORD = os.environ.get(
-    "ADMIN_STATS_PASSWORD",
-    "",
-)
 
 
 # --- Statistiques de fréquentation ---
@@ -68,9 +57,6 @@ def _appareil_visite():
     return "Autre"
 
 def enregistrer_visite(action):
-    if session.get("stats_admin"):
-        return
-
     appareil = _appareil_visite()
     if appareil == "Robot": return
     identifiant = session.get("stat_session")
@@ -91,184 +77,13 @@ def enregistrer_ouverture_unique():
         enregistrer_visite("Ouverture")
         session["visite_comptee"] = True
 
-def _identifiants_statistiques_valides():
-    autorisation = request.authorization
-
-    if not ADMIN_STATS_PASSWORD:
-        return False
-
-    if not autorisation:
-        return False
-
-    utilisateur_valide = secrets.compare_digest(
-        autorisation.username or "",
-        ADMIN_STATS_USER,
-    )
-    mot_de_passe_valide = secrets.compare_digest(
-        autorisation.password or "",
-        ADMIN_STATS_PASSWORD,
-    )
-
-    return utilisateur_valide and mot_de_passe_valide
-
-
 @app.route("/statistiques/telecharger")
 def telecharger_statistiques():
-    if not _identifiants_statistiques_valides():
-        return Response(
-            "Accès administrateur requis.",
-            status=401,
-            headers={
-                "WWW-Authenticate": (
-                    'Basic realm="Statistiques administrateur"'
-                )
-            },
-        )
+    contenu = (FICHIER_VISITES.read_text(encoding="utf-8-sig")
+               if FICHIER_VISITES.exists() else ";".join(ENTETES_VISITES) + "\n")
+    return Response(contenu, mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=statistiques_visites.csv"})
 
-    contenu = (
-        FICHIER_VISITES.read_text(
-            encoding="utf-8-sig"
-        )
-        if FICHIER_VISITES.exists()
-        else ";".join(ENTETES_VISITES) + "\n"
-    )
-
-    return Response(
-        contenu,
-        mimetype="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": (
-                "attachment; "
-                "filename=statistiques_visites.csv"
-            )
-        },
-    )
-
-
-
-ADMIN_STATISTIQUES_HTML = """
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Statistiques administrateur</title>
-<style>
-:root{--fond:#020813;--panneau:#071321;--cyan:#37e8ff;--texte:#f5fbff}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--fond);color:var(--texte);font-family:"Segoe UI",Arial,sans-serif}
-.entete{padding:18px 30px;background:#1d2633;border-bottom:1px solid #27384b;display:flex;justify-content:space-between;align-items:center}
-.entete h1{margin:0;color:#48bfff;font-size:20px}
-.actions{display:flex;gap:10px}
-.bouton{padding:9px 16px;border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);text-decoration:none;font-size:12px;font-weight:700;background:#071728}
-.page{width:min(1450px,96vw);margin:0 auto;padding:25px 0}
-.resume{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
-.carte{background:var(--panneau);border:1px solid #17384c;border-radius:8px;padding:18px;text-align:center}
-.carte strong{display:block;color:var(--cyan);font-size:28px;margin-bottom:5px}
-.carte span{color:#b9d9ed;font-size:12px}
-.tableau{overflow:auto;border:1px solid #17384c;border-radius:8px;background:var(--panneau)}
-table{width:100%;border-collapse:collapse;min-width:950px}
-th{background:#0b2032;color:var(--cyan);text-align:left;padding:12px 10px;font-size:12px}
-td{padding:10px;border-top:1px solid #132d3d;font-size:12px;white-space:nowrap}
-.vide{text-align:center;padding:40px;color:#7da0ad}
-@media(max-width:700px){.resume{grid-template-columns:1fr}.entete{align-items:flex-start;gap:12px;flex-direction:column}}
-</style>
-</head>
-<body>
-<header class="entete">
-<h1>STATISTIQUES DE FRÉQUENTATION</h1>
-<div class="actions">
-<a class="bouton" href="/statistiques/telecharger">TÉLÉCHARGER CSV</a>
-<a class="bouton" href="/">RETOUR COCKPIT</a>
-</div>
-</header>
-<main class="page">
-<div class="resume">
-<div class="carte"><strong>{{ total_lignes }}</strong><span>ÉVÉNEMENTS</span></div>
-<div class="carte"><strong>{{ total_sessions }}</strong><span>VISITEURS / SESSIONS</span></div>
-<div class="carte"><strong>{{ total_simulations }}</strong><span>SIMULATIONS</span></div>
-</div>
-{% if lignes %}
-<div class="tableau">
-<table>
-<thead><tr><th>Date France</th><th>Heure France</th><th>Session</th><th>Origine</th><th>Appareil</th><th>Action</th><th>Chemin</th></tr></thead>
-<tbody>
-{% for ligne in lignes %}
-<tr>
-<td>{{ ligne.date_france }}</td><td>{{ ligne.heure_france }}</td><td>{{ ligne.session }}</td>
-<td>{{ ligne.origine }}</td><td>{{ ligne.appareil }}</td><td>{{ ligne.action }}</td><td>{{ ligne.chemin }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-{% else %}
-<div class="vide">Aucune statistique enregistrée.</div>
-{% endif %}
-</main>
-</body>
-</html>
-"""
-
-
-@app.route("/admin/statistiques")
-def admin_statistiques():
-    if not _identifiants_statistiques_valides():
-        return Response(
-            "Accès administrateur requis.",
-            status=401,
-            headers={"WWW-Authenticate": 'Basic realm="Statistiques administrateur"'},
-        )
-
-    session["stats_admin"] = True
-
-    lignes = []
-    if FICHIER_VISITES.exists():
-        with FICHIER_VISITES.open("r", newline="", encoding="utf-8-sig") as fichier:
-            lignes = list(csv.DictReader(fichier, delimiter=";"))
-
-    fuseau_france = ZoneInfo("Europe/Paris")
-
-    for ligne in lignes:
-        try:
-            date_heure_utc = datetime.strptime(
-                f"{ligne.get('date_utc', '')} {ligne.get('heure_utc', '')}",
-                "%d/%m/%Y %H:%M:%S",
-            ).replace(tzinfo=timezone.utc)
-
-            date_heure_france = date_heure_utc.astimezone(
-                fuseau_france
-            )
-
-            ligne["date_france"] = date_heure_france.strftime(
-                "%d/%m/%Y"
-            )
-            ligne["heure_france"] = date_heure_france.strftime(
-                "%H:%M:%S"
-            )
-        except (TypeError, ValueError):
-            ligne["date_france"] = ligne.get("date_utc", "")
-            ligne["heure_france"] = ligne.get("heure_utc", "")
-
-    lignes.reverse()
-    sessions = {
-        ligne.get("session", "")
-        for ligne in lignes
-        if ligne.get("session")
-    }
-    total_simulations = sum(
-        1
-        for ligne in lignes
-        if ligne.get("action") == "Simulation"
-    )
-
-    return render_template_string(
-        ADMIN_STATISTIQUES_HTML,
-        lignes=lignes,
-        total_lignes=len(lignes),
-        total_sessions=len(sessions),
-        total_simulations=total_simulations,
-    )
 
 def obtenir_service_projection_utilisateur():
     return ServiceProjection()
@@ -508,6 +323,16 @@ button,.reset{flex:1;border:0;padding:10px;background:#0c9bd8;color:white;font-w
     .lancer{width:88px;height:88px}
 }
 
+
+.audio-controle{
+    position:fixed;right:18px;bottom:18px;z-index:9999;
+    width:42px;height:42px;border:1px solid #37e8ff;border-radius:50%;
+    background:#071728;color:#37e8ff;font-size:19px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 0 12px rgba(55,232,255,.18);
+}
+.audio-controle:hover{background:#0c3148}
+
 </style>
 </head>
 <body>
@@ -577,9 +402,46 @@ Confiance : en attente
 {% endif %}
 </div>
 
-<button class="lancer" type="button" onclick="document.getElementById('formulaire').classList.add('ouvert')">
+<button class="lancer" type="button" onclick="ouvrirSimulationAudio()">
 SIMULER
 </button>
+<audio id="voixSimulation" src="/static/audio/audio_simulation.mp3" preload="auto"></audio>
+<script>
+function arreterTousLesAudios(){
+    document.querySelectorAll("audio").forEach(function(audio){
+        audio.pause();
+        try { audio.currentTime = 0; } catch(e) {}
+    });
+
+    const guide = document.getElementById("voixGuide");
+    if (guide) {
+        guide.dataset.arretee = "1";
+        guide.muted = true;
+    }
+}
+
+function ouvrirSimulationAudio(){
+    document.getElementById('formulaire').classList.add('ouvert');
+    const simulation = document.getElementById('voixSimulation');
+    const coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    arreterTousLesAudios();
+
+    if (simulation && !coupe) {
+        simulation.muted = false;
+        simulation.volume = 1.0;
+        simulation.currentTime = 0;
+        simulation.play().catch(function(){});
+    }
+}
+
+// Coupe la voix d'accueil AVANT le clic SIMULER.
+document.addEventListener("pointerdown", function(e){
+    if (e.target.closest(".lancer")) {
+        arreterTousLesAudios();
+    }
+}, true);
+</script>
 
 <form id="formulaire" class="formulaire {% if request.method == 'POST' and erreur %}ouvert{% endif %}" method="post">
 <h2>PARAMÈTRES DE SIMULATION</h2>
@@ -595,6 +457,107 @@ SIMULER
 <div class="note">Outil pédagogique de simulation — aucune projection ne constitue une garantie de résultat futur.<br>© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 </div>
+
+{% if simulation %}
+
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="voixGuide" src="/static/audio/audio_resultats.mp3" preload="auto"></audio>
+<button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
+<script>
+(function(){
+    const musique = document.getElementById("musiqueFond");
+    const voix = document.getElementById("voixGuide");
+    const bouton = document.getElementById("audioControle");
+    let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    musique.volume = 0.12;
+    voix.volume = 1.0;
+
+    function appliquer(){
+        musique.muted = coupe;
+        voix.muted = coupe;
+        bouton.textContent = coupe ? "🔇" : "🔊";
+    }
+
+    function demarrer(){
+        if (coupe) return;
+        musique.play().catch(function(){});
+        if (voix.dataset.arretee !== "1") {
+            voix.play().catch(function(){});
+        }
+    }
+
+    appliquer();
+
+    demarrer();
+
+    document.addEventListener("pointerdown", function premierGeste(e){
+        if (e.target === bouton) return;
+        demarrer();
+        document.removeEventListener("pointerdown", premierGeste);
+    }, {once:true});
+
+    bouton.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        coupe = !coupe;
+        localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
+        appliquer();
+        if (!coupe) demarrer();
+    });
+})();
+</script>
+
+{% else %}
+
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="voixGuide" src="/static/audio/guide_simulateur.mp3" preload="auto"></audio>
+<button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
+<script>
+(function(){
+    const musique = document.getElementById("musiqueFond");
+    const voix = document.getElementById("voixGuide");
+    const bouton = document.getElementById("audioControle");
+    let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    musique.volume = 0.12;
+    voix.volume = 1.0;
+
+    function appliquer(){
+        musique.muted = coupe;
+        voix.muted = coupe;
+        bouton.textContent = coupe ? "🔇" : "🔊";
+    }
+
+    function demarrer(){
+        if (coupe) return;
+        musique.play().catch(function(){});
+        voix.play().catch(function(){});
+    }
+
+    appliquer();
+
+    demarrer();
+
+    document.addEventListener("pointerdown", function premierGeste(e){
+        if (e.target === bouton || e.target.closest(".lancer")) return;
+        demarrer();
+        document.removeEventListener("pointerdown", premierGeste);
+    }, {once:true});
+
+    bouton.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        coupe = !coupe;
+        localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
+        appliquer();
+        if (!coupe) demarrer();
+    });
+})();
+</script>
+
+{% endif %}
+
 </body>
 </html>
 """
@@ -919,6 +882,16 @@ select{
     .selection,.colonnes{grid-template-columns:1fr}
     .synthese-grille{grid-template-columns:1fr 1fr}
 }
+
+.audio-controle{
+    position:fixed;right:18px;bottom:18px;z-index:9999;
+    width:42px;height:42px;border:1px solid #37e8ff;border-radius:50%;
+    background:#071728;color:#37e8ff;font-size:19px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 0 12px rgba(55,232,255,.18);
+}
+.audio-controle:hover{background:#0c3148}
+
 </style>
 </head>
 <body>
@@ -989,6 +962,53 @@ select{
 {% endif %}
 <div class="copyright">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
+
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="voixGuide" src="/static/audio/audio_comparaison.mp3" preload="auto"></audio>
+<button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
+<script>
+(function(){
+    const musique = document.getElementById("musiqueFond");
+    const voix = document.getElementById("voixGuide");
+    const bouton = document.getElementById("audioControle");
+    let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    musique.volume = 0.12;
+    voix.volume = 1.0;
+
+    function appliquer(){
+        musique.muted = coupe;
+        voix.muted = coupe;
+        bouton.textContent = coupe ? "🔇" : "🔊";
+    }
+
+    function demarrer(){
+        if (coupe) return;
+        musique.play().catch(function(){});
+        voix.play().catch(function(){});
+    }
+
+    appliquer();
+
+    demarrer();
+
+    document.addEventListener("pointerdown", function premierGeste(e){
+        if (e.target === bouton) return;
+        demarrer();
+        document.removeEventListener("pointerdown", premierGeste);
+    }, {once:true});
+
+    bouton.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        coupe = !coupe;
+        localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
+        appliquer();
+        if (!coupe) demarrer();
+    });
+})();
+</script>
+
 </body>
 </html>
 """
@@ -1082,6 +1102,16 @@ th{background:#0b2032;color:var(--cyan);text-align:left;padding:12px 10px;font-s
 td{padding:11px 10px;border-top:1px solid #132d3d;font-size:12px;white-space:nowrap}
 tr:hover td{background:#0a1a2a}
 .vide{text-align:center;padding:45px;color:#7da0ad}
+
+.audio-controle{
+    position:fixed;right:18px;bottom:18px;z-index:9999;
+    width:42px;height:42px;border:1px solid #37e8ff;border-radius:50%;
+    background:#071728;color:#37e8ff;font-size:19px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 0 12px rgba(55,232,255,.18);
+}
+.audio-controle:hover{background:#0c3148}
+
 </style>
 </head>
 <body>
@@ -1123,6 +1153,53 @@ tr:hover td{background:#0a1a2a}
 {% endif %}
 <div style="text-align:center;color:#477887;font-size:10px;margin:18px 0 4px">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
+
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="voixGuide" src="/static/audio/audio_historique.mp3" preload="auto"></audio>
+<button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
+<script>
+(function(){
+    const musique = document.getElementById("musiqueFond");
+    const voix = document.getElementById("voixGuide");
+    const bouton = document.getElementById("audioControle");
+    let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    musique.volume = 0.12;
+    voix.volume = 1.0;
+
+    function appliquer(){
+        musique.muted = coupe;
+        voix.muted = coupe;
+        bouton.textContent = coupe ? "🔇" : "🔊";
+    }
+
+    function demarrer(){
+        if (coupe) return;
+        musique.play().catch(function(){});
+        voix.play().catch(function(){});
+    }
+
+    appliquer();
+
+    demarrer();
+
+    document.addEventListener("pointerdown", function premierGeste(e){
+        if (e.target === bouton) return;
+        demarrer();
+        document.removeEventListener("pointerdown", premierGeste);
+    }, {once:true});
+
+    bouton.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        coupe = !coupe;
+        localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
+        appliquer();
+        if (!coupe) demarrer();
+    });
+})();
+</script>
+
 </body>
 </html>
 """
@@ -1151,6 +1228,16 @@ input,textarea{width:100%;background:#0b2032;color:white;border:1px solid #28718
 textarea{min-height:150px;resize:vertical}
 button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);border-radius:5px;background:#0c3148;color:var(--cyan);font-weight:800;cursor:pointer}
 .info{text-align:center;color:#7da0ad;font-size:12px;margin-top:18px}
+
+.audio-controle{
+    position:fixed;right:18px;bottom:18px;z-index:9999;
+    width:42px;height:42px;border:1px solid #37e8ff;border-radius:50%;
+    background:#071728;color:#37e8ff;font-size:19px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 0 12px rgba(55,232,255,.18);
+}
+.audio-controle:hover{background:#0c3148}
+
 </style>
 </head>
 <body>
@@ -1178,6 +1265,53 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 </div>
 <div class="info">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
+
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="voixGuide" src="/static/audio/audio_contact.mp3" preload="auto"></audio>
+<button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
+<script>
+(function(){
+    const musique = document.getElementById("musiqueFond");
+    const voix = document.getElementById("voixGuide");
+    const bouton = document.getElementById("audioControle");
+    let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
+
+    musique.volume = 0.12;
+    voix.volume = 1.0;
+
+    function appliquer(){
+        musique.muted = coupe;
+        voix.muted = coupe;
+        bouton.textContent = coupe ? "🔇" : "🔊";
+    }
+
+    function demarrer(){
+        if (coupe) return;
+        musique.play().catch(function(){});
+        voix.play().catch(function(){});
+    }
+
+    appliquer();
+
+    demarrer();
+
+    document.addEventListener("pointerdown", function premierGeste(e){
+        if (e.target === bouton) return;
+        demarrer();
+        document.removeEventListener("pointerdown", premierGeste);
+    }, {once:true});
+
+    bouton.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        coupe = !coupe;
+        localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
+        appliquer();
+        if (!coupe) demarrer();
+    });
+})();
+</script>
+
 </body>
 </html>
 """
