@@ -405,7 +405,7 @@ Confiance : en attente
 <button class="lancer" type="button" onclick="ouvrirSimulationAudio()">
 SIMULER
 </button>
-<audio id="voixSimulation" src="/static/audio/audio_simulation.mp3" preload="auto"></audio>
+<audio id="voixSimulation" src="/guide_simulateur.mp3" preload="auto"></audio>
 <script>
 function arreterTousLesAudios(){
     document.querySelectorAll("audio").forEach(function(audio){
