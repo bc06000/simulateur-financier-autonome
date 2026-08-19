@@ -564,7 +564,7 @@ document.addEventListener("pointerdown", function(e){
 
 @app.route("/guide_simulateur.mp3")
 def guide_simulateur_audio():
-    return app.send_file(Path(__file__).resolve().parent / "guide_simulateur.mp3")
+    return app.send_static_file("guide_simulateur.mp3")
 @app.route(
     "/",
     methods=["GET", "POST"],
