@@ -460,7 +460,7 @@ document.addEventListener("pointerdown", function(e){
 
 {% if simulation %}
 
-<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_resultats.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -510,7 +510,7 @@ document.addEventListener("pointerdown", function(e){
 
 {% else %}
 
-<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/guide_simulateur.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -565,6 +565,13 @@ document.addEventListener("pointerdown", function(e){
 @app.route("/guide_simulateur.mp3")
 def guide_simulateur_audio():
    return send_file(Path(__file__).resolve().parent / "guide_simulateur.mp3", mimetype="audio/mpeg")
+@app.route("/musique_fond.mp3")
+def musique_fond_audio():
+    return send_file(
+        Path(__file__).resolve().parent / "musique_fond.mp3",
+        mimetype="audio/mpeg"
+    )
+
 @app.route(
     "/",
     methods=["GET", "POST"],
@@ -965,7 +972,7 @@ select{
 <div class="copyright">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_comparaison.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -1156,7 +1163,7 @@ tr:hover td{background:#0a1a2a}
 <div style="text-align:center;color:#477887;font-size:10px;margin:18px 0 4px">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_historique.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -1268,7 +1275,7 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 <div class="info">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_contact.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
