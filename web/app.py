@@ -14,7 +14,7 @@ import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, request, render_template_string, session, Response, send_file
+from flask import Flask, request, render_template_string, session, Response
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 
@@ -405,7 +405,7 @@ Confiance : en attente
 <button class="lancer" type="button" onclick="ouvrirSimulationAudio()">
 SIMULER
 </button>
-<audio id="voixSimulation" src="/guide_simulateur.mp3" preload="auto"></audio>
+<audio id="voixSimulation" src="/static/audio/guide_simulateur.mp3" preload="auto"></audio>
 <script>
 function arreterTousLesAudios(){
     document.querySelectorAll("audio").forEach(function(audio){
@@ -460,7 +460,7 @@ document.addEventListener("pointerdown", function(e){
 
 {% if simulation %}
 
-<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_resultats.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -510,40 +510,17 @@ document.addEventListener("pointerdown", function(e){
 
 {% else %}
 
-<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
-<audio id="voixGuide" src="/static/audio/guide_simulateur.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
 (function(){
-    const musique = document.getElementById("musiqueFond");
-    const voix = document.getElementById("voixGuide");
     const bouton = document.getElementById("audioControle");
     let coupe = localStorage.getItem("simulateur_audio_coupe") === "1";
 
-    musique.volume = 0.12;
-    voix.volume = 1.0;
-
     function appliquer(){
-        musique.muted = coupe;
-        voix.muted = coupe;
         bouton.textContent = coupe ? "🔇" : "🔊";
     }
 
-    function demarrer(){
-        if (coupe) return;
-        musique.play().catch(function(){});
-        voix.play().catch(function(){});
-    }
-
     appliquer();
-
-    demarrer();
-
-    document.addEventListener("pointerdown", function premierGeste(e){
-        if (e.target === bouton || e.target.closest(".lancer")) return;
-        demarrer();
-        document.removeEventListener("pointerdown", premierGeste);
-    }, {once:true});
 
     bouton.addEventListener("click", function(e){
         e.preventDefault();
@@ -551,7 +528,6 @@ document.addEventListener("pointerdown", function(e){
         coupe = !coupe;
         localStorage.setItem("simulateur_audio_coupe", coupe ? "1" : "0");
         appliquer();
-        if (!coupe) demarrer();
     });
 })();
 </script>
@@ -561,16 +537,6 @@ document.addEventListener("pointerdown", function(e){
 </body>
 </html>
 """
-
-@app.route("/guide_simulateur.mp3")
-def guide_simulateur_audio():
-   return send_file(Path(__file__).resolve().parent / "guide_simulateur.mp3", mimetype="audio/mpeg")
-@app.route("/musique_fond.mp3")
-def musique_fond_audio():
-    return send_file(
-        Path(__file__).resolve().parent / "musique_fond.mp3",
-        mimetype="audio/mpeg"
-    )
 
 @app.route(
     "/",
@@ -972,7 +938,7 @@ select{
 <div class="copyright">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_comparaison.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -1163,7 +1129,7 @@ tr:hover td{background:#0a1a2a}
 <div style="text-align:center;color:#477887;font-size:10px;margin:18px 0 4px">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_historique.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
@@ -1275,7 +1241,7 @@ button{width:100%;margin-top:20px;padding:12px;border:1px solid var(--cyan);bord
 <div class="info">© 2026 Simulateur Financier Autonome — Tous droits réservés.</div>
 </main>
 
-<audio id="musiqueFond" src="/musique_fond.mp3" preload="auto" loop></audio>
+<audio id="musiqueFond" src="/static/audio/musique_fond.mp3" preload="auto" loop></audio>
 <audio id="voixGuide" src="/static/audio/audio_contact.mp3" preload="auto"></audio>
 <button id="audioControle" class="audio-controle" type="button" aria-label="Activer ou couper le son" title="Activer / couper le son">🔊</button>
 <script>
